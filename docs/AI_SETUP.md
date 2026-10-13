@@ -1,6 +1,6 @@
 # IA y documentos privados · Sprint 6
 
-La base del Sprint 6 ya está versionada, pero el análisis no se activa hasta que el responsable configure una clave de OpenAI en Supabase. Esto evita exponer una clave, generar gasto inesperado o fingir que la IA está funcionando.
+KODA usa Gemini únicamente desde una Edge Function de Supabase. La APK no conoce ni puede extraer la clave de Gemini. El modelo inicial es `gemini-3.5-flash-lite`, elegido para análisis de documentos de alto volumen y respuestas estructuradas; se puede reemplazar mediante un secreto sin cambiar la aplicación.
 
 ## Flujo seguro
 
@@ -10,44 +10,50 @@ sequenceDiagram
   participant A as APK KODA
   participant S as Storage privado
   participant F as Edge Function
-  participant O as OpenAI Responses API
+  participant G as Gemini API
 
-  E->>A: Elige un PDF
+  E->>A: Elige un PDF propio
   A->>S: Sube a user-id/archivo.pdf
   A->>F: Pide análisis con JWT de sesión
-  F->>F: Verifica sesión, ruta, PDF y máximo de 10 MB
-  F->>S: Descarga solo el archivo de ese estudiante
-  F->>O: Envía PDF y consigna estructurada
-  O-->>F: Resumen, puntos clave y flashcards
-  F-->>A: Devuelve JSON validado
+  F->>F: Verifica sesión, ruta, PDF, tamaño y cuota
+  F->>S: Descarga solo el archivo autorizado
+  F->>G: Envía el PDF en memoria y una consigna estructurada
+  G-->>F: Resumen, tarjetas y preguntas JSON
+  F-->>A: Devuelve solo JSON validado
 ```
 
-## Lo que ya está preparado
+## Protecciones incluidas
 
 - Bucket privado `koda-study-documents`, limitado a PDF de 10 MB.
-- Políticas Storage: una persona solo puede listar, subir, leer, actualizar o eliminar objetos bajo su propio UUID.
-- Función `analyze-study-document`, autenticada con JWT de usuario.
-- Validación de la ruta, tipo y tamaño antes de contactar a OpenAI.
-- Respuesta con JSON estructurado: título, resumen, puntos clave y flashcards.
+- Políticas Storage: cada estudiante solo opera objetos cuyo primer directorio es su UUID.
+- Tabla de documentos y resultados protegida por RLS; un estudiante no puede leer los de otro.
+- Consentimiento explícito antes del primer envío a IA.
+- La función verifica JWT, propiedad, tipo, tamaño y usa una cuota atómica de **2 análisis de PDF por estudiante al día** (hora de Lima).
+- El archivo se pasa en memoria a Gemini; KODA no usa el File API de Gemini ni expone enlaces públicos.
+- La respuesta se valida antes de guardarla: título, resumen, puntos clave, hasta 8 flashcards y hasta 5 preguntas de cuatro alternativas.
 
-La función usa `input_file` de la Responses API para que un PDF aporte texto y páginas. El formato de salida se fuerza con JSON Schema estricto. Consulta la [guía oficial de archivos](https://developers.openai.com/api/docs/guides/file-inputs) y la [guía oficial de Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs).
+El análisis es una ayuda de repaso, no una fuente académica definitiva: la persona debe contrastar resumen, tarjetas y alternativas con su material.
 
 ## Activación por el responsable
 
-1. Confirma el presupuesto y crea una clave de servidor en OpenAI.
-2. En Supabase, guarda `OPENAI_API_KEY` como secreto del proyecto. No la copies a `.env`, GitHub, la APK ni un chat.
-3. Opcionalmente define `OPENAI_MODEL`; si no existe, la función solicita `gpt-6-astra`.
-4. Despliega la función autenticada:
+1. Crea una clave de servidor en [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. Guárdala **solo** como secreto de Supabase. Nunca en `.env`, GitHub, la APK ni un chat.
+
+```powershell
+npx supabase secrets set GEMINI_API_KEY="tu_clave_privada" GEMINI_MODEL="gemini-3.5-flash-lite"
+```
+
+3. Despliega o vuelve a desplegar la función:
 
 ```powershell
 npx supabase functions deploy analyze-study-document
 ```
 
-5. Prueba con un PDF no sensible en una cuenta de desarrollo antes de habilitar la pantalla para estudiantes.
+4. Prueba con un PDF no sensible en una cuenta de desarrollo antes de habilitarlo a más estudiantes.
+5. Consulta las cuotas reales del proyecto en AI Studio antes de aumentar el límite de KODA. El límite local por estudiante evita abusos, pero no sustituye los límites de Google.
 
-## Límites que quedan pendientes
+## Límites del plan gratuito
 
-- Añadir a la APK el selector y cargador de PDFs con progreso y mensajes de error.
-- Aplicar una cuota diaria por estudiante antes de ofrecer IA a todo el grupo.
-- Guardar resultados aceptados por el estudiante como resúmenes o flashcards, nunca reemplazarlos automáticamente.
-- Probar la función con Deno/Supabase local y con un dispositivo físico antes de marcar S6 como terminado.
+Gemini puede cambiar sus cuotas gratuitas por modelo y proyecto. Por eso KODA no promete solicitudes ilimitadas ni usa la clave desde el móvil. Además, los términos de Google pueden tratar los datos del nivel gratuito de forma distinta al nivel de pago; revisa la política vigente y evita enviar información sensible de terceros.
+
+Referencias oficiales: [modelo Gemini Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite), [procesamiento de documentos](https://ai.google.dev/gemini-api/docs/document-processing), [salida estructurada](https://ai.google.dev/gemini-api/docs/structured-output), [cuotas](https://ai.google.dev/gemini-api/docs/rate-limits) y [precios](https://ai.google.dev/gemini-api/docs/pricing).

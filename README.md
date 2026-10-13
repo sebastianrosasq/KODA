@@ -115,6 +115,6 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 
 - Los commits se escriben en español, claros y centrados en un cambio concreto.
 - Antes de subir cambios, ejecuta TypeScript y lint.
-- No versionar `.env`, claves de OpenAI, contraseñas, tokens personales, archivos de firma ni datos reales de estudiantes.
+- No versionar `.env`, claves de Gemini, contraseñas, tokens personales, archivos de firma ni datos reales de estudiantes.
 - Para librerías Expo usa `npx expo install nombre-del-paquete`; así se conserva compatibilidad con Expo SDK 57.
 - Un curso sugerido nunca reemplaza la decisión del estudiante.

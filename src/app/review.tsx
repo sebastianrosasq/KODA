@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
 
 import {
   KodaButton,
@@ -134,6 +135,17 @@ export default function ReviewScreen() {
         <KodaProgressBar color={theme.accent} progress={masteryPercent} />
       </KodaCard>
 
+      <KodaCard style={[styles.materialsCard, { backgroundColor: theme.surfaceMuted }]}>
+        <View style={[styles.materialsIcon, { backgroundColor: theme.accentSoft }]}>
+          <Ionicons color={theme.accent} name="document-text-outline" size={20} />
+        </View>
+        <View style={styles.materialsCopy}>
+          <Text style={[styles.materialsTitle, { color: theme.text }]}>Convierte tus apuntes en práctica</Text>
+          <Text style={[styles.materialsDetail, { color: theme.textSecondary }]}>Sube un PDF privado para obtener un resumen, tarjetas y un simulacro revisable.</Text>
+        </View>
+        <KodaButton icon="sparkles-outline" label="Materiales" onPress={() => router.push('/materials')} variant="secondary" />
+      </KodaCard>
+
       {isCreateVisible ? <FlashcardModal onClose={() => setCreateVisible(false)} onCreate={addFlashcard} /> : null}
     </KodaScreen>
   );
@@ -231,6 +243,11 @@ const styles = StyleSheet.create({
   masteryTitle: { fontSize: 15, fontWeight: '900' },
   masteryDetail: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   masteryPercent: { fontSize: 22, fontWeight: '900', letterSpacing: -0.6 },
+  materialsCard: { gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  materialsIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 40, justifyContent: 'center', width: 40 },
+  materialsCopy: { gap: 3 },
+  materialsTitle: { fontSize: 14, fontWeight: '900' },
+  materialsDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
   pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
   modalOverlay: { alignItems: 'center', flex: 1, justifyContent: 'flex-end', padding: KodaSpacing.md },
   modalCard: { borderRadius: KodaRadius.lg, borderWidth: 1, maxHeight: '90%', maxWidth: 560, padding: KodaSpacing.xl, width: '100%' },

@@ -40,7 +40,7 @@ La segunda migración añade RLS a cada tabla nueva. Cada política verifica que
 3. Ejecuta `npm ci` y luego `npm run start`.
 4. Crea una cuenta desde Perfil o inicia sesión. El estado de sincronización aparece bajo “Cuenta y privacidad”.
 
-No se debe pegar por chat ni versionar una contraseña de base de datos, un `service_role`, tokens personales, claves de OpenAI ni credenciales FCM.
+No se debe pegar por chat ni versionar una contraseña de base de datos, un `service_role`, tokens personales, claves de Gemini ni credenciales FCM.
 
 ## Validación técnica esperada
 

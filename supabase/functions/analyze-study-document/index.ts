@@ -1,21 +1,24 @@
-import '@supabase/functions-js/edge-runtime.d.ts';
-import { withSupabase } from '@supabase/server';
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const DOCUMENT_BUCKET = 'koda-study-documents';
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const corsHeaders = {
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Origin': '*',
+};
 
 const studySchema = {
   type: 'object',
-  additionalProperties: false,
   properties: {
     title: { type: 'string' },
     summary: { type: 'string' },
-    key_points: { type: 'array', items: { type: 'string' } },
+    keyPoints: { type: 'array', items: { type: 'string' } },
     flashcards: {
       type: 'array',
       items: {
         type: 'object',
-        additionalProperties: false,
         properties: {
           question: { type: 'string' },
           answer: { type: 'string' },
@@ -23,98 +26,265 @@ const studySchema = {
         required: ['question', 'answer'],
       },
     },
+    quizQuestions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          question: { type: 'string' },
+          options: { type: 'array', items: { type: 'string' } },
+          correctOption: { type: 'integer' },
+          explanation: { type: 'string' },
+        },
+        required: ['question', 'options', 'correctOption', 'explanation'],
+      },
+    },
   },
-  required: ['title', 'summary', 'key_points', 'flashcards'],
+  required: ['title', 'summary', 'keyPoints', 'flashcards', 'quizQuestions'],
 };
 
-function response(message: string, status: number) {
-  return Response.json({ error: message }, { status });
+type StudyDocument = {
+  id: string;
+  storage_path: string;
+  analysis_status: string;
+  analysis: unknown;
+};
+
+type GeminiPayload = {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+function getPublishableKey() {
+  const serializedKeys = Deno.env.get('SUPABASE_PUBLISHABLE_KEYS');
+  if (serializedKeys) {
+    try {
+      const keys = JSON.parse(serializedKeys) as Record<string, string>;
+      return keys.default ?? Object.values(keys)[0] ?? '';
+    } catch {
+      // El proyecto puede usar las variables heredadas durante la transición de claves.
+    }
+  }
+  return Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+}
+
+function getSecretKey() {
+  const serializedKeys = Deno.env.get('SUPABASE_SECRET_KEYS');
+  if (serializedKeys) {
+    try {
+      const keys = JSON.parse(serializedKeys) as Record<string, string>;
+      return keys.default ?? Object.values(keys)[0] ?? '';
+    } catch {
+      // Los proyectos que no migraron aún pueden usar la variable heredada.
+    }
+  }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
 function toBase64(bytes: Uint8Array) {
-  let binary = '';
+  let result = '';
   const chunkSize = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    result += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
   }
-  return btoa(binary);
+  return btoa(result);
 }
 
-function readOutputText(payload: { output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }> }) {
-  const message = payload.output?.find((item) => item.type === 'message');
-  return message?.content?.find((item) => item.type === 'output_text')?.text ?? null;
+function asText(value: unknown, maximumLength: number) {
+  return typeof value === 'string' ? value.trim().slice(0, maximumLength) : '';
 }
 
-export default {
-  fetch: withSupabase({ auth: 'user' }, async (request, context) => {
-    if (request.method !== 'POST') return response('Método no permitido.', 405);
+function asTextList(value: unknown, maxItems: number, maximumLength: number) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => asText(item, maximumLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
 
-    const payload = await request.json().catch(() => null) as { storagePath?: unknown } | null;
-    const storagePath = typeof payload?.storagePath === 'string' ? payload.storagePath : '';
-    const userId = context.userClaims?.sub;
-    if (!userId || !storagePath || storagePath.includes('..') || !storagePath.startsWith(`${userId}/`)) {
-      return response('Documento no autorizado.', 403);
-    }
+function normalizeAnalysis(value: unknown) {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  const title = asText(candidate.title, 160);
+  const summary = asText(candidate.summary, 1800);
+  const keyPoints = asTextList(candidate.keyPoints, 8, 320);
+  const flashcards = Array.isArray(candidate.flashcards)
+    ? candidate.flashcards.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const card = item as Record<string, unknown>;
+      const question = asText(card.question, 800);
+      const answer = asText(card.answer, 1200);
+      return question && answer ? [{ question, answer }] : [];
+    }).slice(0, 8)
+    : [];
+  const quizQuestions = Array.isArray(candidate.quizQuestions)
+    ? candidate.quizQuestions.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const question = item as Record<string, unknown>;
+      const prompt = asText(question.question, 800);
+      const options = Array.isArray(question.options)
+        ? question.options.map((option) => asText(option, 360))
+        : [];
+      const correctOption = typeof question.correctOption === 'number' ? question.correctOption : -1;
+      const explanation = asText(question.explanation, 700);
+      return prompt && options.length === 4 && options.every(Boolean) && new Set(options).size === 4 && correctOption >= 0 && correctOption < options.length && explanation
+        ? [{ question: prompt, options, correctOption, explanation }]
+        : [];
+    }).slice(0, 5)
+    : [];
 
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!apiKey) return response('El análisis con IA aún no está configurado.', 503);
+  if (!title || !summary) return null;
+  return { title, summary, keyPoints, flashcards, quizQuestions };
+}
 
-    const { data: document, error: downloadError } = await context.supabase.storage
-      .from(DOCUMENT_BUCKET)
-      .download(storagePath);
-    if (downloadError || !document) return response('No se pudo acceder al documento solicitado.', 404);
-    if (document.type !== 'application/pdf' || document.size > MAX_DOCUMENT_BYTES) {
-      return response('Solo se aceptan PDF de hasta 10 MB.', 400);
-    }
+function readGeminiText(payload: GeminiPayload) {
+  return payload.candidates
+    ?.flatMap((candidate) => candidate.content?.parts ?? [])
+    .map((part) => part.text ?? '')
+    .join('')
+    .trim() ?? '';
+}
 
-    const bytes = new Uint8Array(await document.arrayBuffer());
-    const openAiResponse = await fetch('https://api.openai.com/v1/responses', {
+async function markDocument(
+  client: ReturnType<typeof createClient>,
+  documentId: string,
+  values: Record<string, unknown>,
+) {
+  const { error } = await client
+    .from('student_study_documents')
+    .update({ ...values, updated_at: new Date().toISOString() })
+    .eq('id', documentId);
+  if (error) console.error('No se pudo actualizar el estado del documento', error.message);
+}
+
+Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (request.method !== 'POST') return json({ error: 'Método no permitido.' }, 405);
+
+  const authorization = request.headers.get('Authorization');
+  if (!authorization?.startsWith('Bearer ')) return json({ error: 'Inicia sesión para analizar un documento.' }, 401);
+
+  const url = Deno.env.get('SUPABASE_URL') ?? '';
+  const publishableKey = getPublishableKey();
+  const secretKey = getSecretKey();
+  if (!url || !publishableKey || !secretKey) return json({ error: 'La función no tiene configuración de Supabase.' }, 500);
+
+  const client = createClient(url, publishableKey, {
+    global: { headers: { Authorization: authorization } },
+  });
+  const adminClient = createClient(url, secretKey);
+  const token = authorization.replace('Bearer ', '');
+  const { data: userData, error: userError } = await client.auth.getUser(token);
+  if (userError || !userData.user) return json({ error: 'Tu sesión ya no es válida.' }, 401);
+
+  const body = await request.json().catch(() => null) as { documentId?: unknown } | null;
+  const documentId = typeof body?.documentId === 'string' ? body.documentId : '';
+  if (!documentId) return json({ error: 'Selecciona un documento válido.' }, 400);
+
+  const { data, error: documentError } = await client
+    .from('student_study_documents')
+    .select('id, storage_path, analysis_status, analysis')
+    .eq('id', documentId)
+    .maybeSingle();
+  const document = data as StudyDocument | null;
+  if (documentError || !document) return json({ error: 'No tienes acceso a este documento.' }, 404);
+  if (document.analysis_status === 'completed' && document.analysis) return json({ analysis: document.analysis });
+  if (document.analysis_status === 'processing') return json({ error: 'Este documento ya se está analizando.' }, 409);
+  if (!document.storage_path.startsWith(`${userData.user.id}/`)) return json({ error: 'Documento no autorizado.' }, 403);
+
+  const apiKey = Deno.env.get('GEMINI_API_KEY');
+  if (!apiKey) return json({ error: 'La IA aún no está configurada para este entorno.' }, 503);
+
+  const { data: pdf, error: downloadError } = await client.storage.from(DOCUMENT_BUCKET).download(document.storage_path);
+  if (downloadError || !pdf || pdf.type !== 'application/pdf' || pdf.size > MAX_DOCUMENT_BYTES) {
+    await markDocument(adminClient, document.id, {
+      analysis_status: 'failed',
+      last_error: 'El PDF no pudo leerse o supera los 10 MB.',
+    });
+    return json({ error: 'Solo se aceptan PDF legibles de hasta 10 MB.' }, 400);
+  }
+
+  const { data: quotaData, error: quotaError } = await adminClient.rpc('consume_koda_ai_quota', {
+    requested_user_id: userData.user.id,
+    requested_operation: 'document_analysis',
+  });
+  const quota = quotaData as { allowed?: boolean; remaining?: number } | null;
+  if (quotaError) {
+    console.error('No se pudo consumir la cuota de IA', quotaError.message);
+    return json({ error: 'No se pudo validar tu cuota de IA.' }, 500);
+  }
+  if (!quota?.allowed) return json({ error: 'Alcanzaste el límite diario de 2 documentos analizados.' }, 429);
+
+  await markDocument(adminClient, document.id, { analysis_status: 'processing', last_error: null });
+
+  const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash-lite';
+  const geminiResponse = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
-        model: Deno.env.get('OPENAI_MODEL') ?? 'gpt-6-astra',
-        input: [{
+        contents: [{
           role: 'user',
-          content: [
+          parts: [
+            { inlineData: { mimeType: 'application/pdf', data: toBase64(new Uint8Array(await pdf.arrayBuffer())) } },
             {
-              type: 'input_file',
-              filename: storagePath.split('/').pop() ?? 'documento.pdf',
-              file_data: `data:application/pdf;base64,${toBase64(bytes)}`,
-              detail: 'low',
-            },
-            {
-              type: 'input_text',
-              text: 'Resume este material para estudiar en semana de exámenes. Devuelve ideas verificables del documento, sin inventar datos. Crea entre 3 y 8 flashcards breves cuando el contenido lo permita.',
+              text: [
+                'Analiza exclusivamente este material para una semana de exámenes.',
+                'No inventes información ni uses fuentes externas.',
+                'Escribe en español claro. Resume las ideas verificables, crea de 3 a 8 flashcards útiles y 3 a 5 preguntas de opción múltiple.',
+                'Cada pregunta debe tener exactamente cuatro opciones, un índice correctOption de 0 a 3 y una explicación breve.',
+              ].join(' '),
             },
           ],
         }],
-        max_output_tokens: 1400,
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'study_document_analysis',
-            strict: true,
-            schema: studySchema,
-          },
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2200,
+          responseMimeType: 'application/json',
+          responseJsonSchema: studySchema,
         },
       }),
+    },
+  );
+
+  if (!geminiResponse.ok) {
+    console.error('Gemini no pudo analizar el documento', geminiResponse.status);
+    await markDocument(adminClient, document.id, {
+      analysis_status: 'failed',
+      last_error: geminiResponse.status === 429
+        ? 'Gemini está ocupado. Intenta nuevamente más tarde.'
+        : 'Gemini no pudo analizar el documento en este momento.',
     });
+    return json({ error: geminiResponse.status === 429 ? 'Gemini está temporalmente ocupado. Intenta luego.' : 'No fue posible analizar el documento.' }, geminiResponse.status === 429 ? 429 : 502);
+  }
 
-    if (!openAiResponse.ok) {
-      console.error('OpenAI request failed', openAiResponse.status);
-      return response('No fue posible analizar el documento en este momento.', 502);
-    }
+  const outputText = readGeminiText(await geminiResponse.json() as GeminiPayload);
+  let analysis = null;
+  try {
+    analysis = normalizeAnalysis(JSON.parse(outputText));
+  } catch {
+    analysis = null;
+  }
+  if (!analysis) {
+    await markDocument(adminClient, document.id, {
+      analysis_status: 'failed',
+      last_error: 'Gemini devolvió un formato que KODA no puede usar.',
+    });
+    return json({ error: 'La IA devolvió un análisis no utilizable. Intenta con otro material.' }, 502);
+  }
 
-    const outputText = readOutputText(await openAiResponse.json());
-    if (!outputText) return response('La IA no devolvió un análisis utilizable.', 502);
-
-    try {
-      return Response.json({ analysis: JSON.parse(outputText) });
-    } catch {
-      return response('La IA devolvió un formato inesperado.', 502);
-    }
-  }),
-};
+  await markDocument(adminClient, document.id, {
+    analysis_status: 'completed',
+    analysis,
+    analysis_completed_at: new Date().toISOString(),
+    last_error: null,
+  });
+  return json({ analysis, remainingAnalyses: quota.remaining ?? 0 });
+});

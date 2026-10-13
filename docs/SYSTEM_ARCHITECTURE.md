@@ -33,19 +33,19 @@ flowchart TD
     end
 
     functions --> push[Expo Push Service / FCM]
-    functions --> ai[OpenAI Responses API]
+    functions --> ai[Gemini API]
 ~~~
 
 ## Responsabilidades
 
 | Parte | Hace | Nunca contiene |
 | --- | --- | --- |
-| APK KODA | Interfaz, navegación, datos del estudiante y reglas de planificación locales. | Claves de OpenAI, Firebase, firma o service_role. |
+| APK KODA | Interfaz, navegación, datos del estudiante y reglas de planificación locales. | Claves de Gemini, Firebase, firma o service_role. |
 | Supabase Auth | Crea sesión y reconoce al usuario autenticado. | Permisos para acceder a datos de otra persona. |
 | PostgreSQL con RLS | Guarda perfiles, cursos, exámenes, temas, sesiones y progreso. | Lecturas o escrituras entre estudiantes distintos. |
 | Storage privado | Guarda material y PDFs de cada estudiante. | Archivos públicos por defecto. |
 | Edge Functions | Procesa IA, PDFs, cuotas y notificaciones. | Secretos enviados a la APK. |
-| OpenAI | Genera ayuda de estudio con datos autorizados. | Acceso directo desde el móvil. |
+| Gemini | Genera ayuda de estudio con datos autorizados. | Acceso directo desde el móvil. |
 
 ## Recorrido futuro de un PDF con IA
 
@@ -55,15 +55,15 @@ sequenceDiagram
     participant A as APK KODA
     participant S as Supabase Storage
     participant F as Edge Function
-    participant O as OpenAI
+    participant G as Gemini
 
     E->>A: Selecciona su PDF
     A->>S: Sube al espacio privado del estudiante
     A->>F: Solicita análisis con sesión autenticada
     F->>F: Valida propiedad, tipo, tamaño y cuota
     F->>S: Lee solo el archivo autorizado
-    F->>O: Envía el contenido mínimo necesario
-    O-->>F: Devuelve resumen o preguntas
+    F->>G: Envía el contenido mínimo necesario
+    G-->>F: Devuelve resumen o preguntas
     F-->>A: Devuelve resultado seguro
     A-->>E: Muestra el resultado
 ~~~

@@ -13,7 +13,7 @@
 | --- | --- | --- |
 | S2 | Supabase | Contraseña de base, service_role y tokens personales. |
 | S5 | Firebase | Archivo de cuenta de servicio FCM v1. |
-| S6 | OpenAI Platform | API key del proyecto y datos de facturación. |
+| S6 | Google AI Studio / Gemini API | API key del proyecto y configuración de cuotas. |
 | S8 | Google Play Console | Credenciales, identidad, claves de firma y cuenta de pagos. |
 
 ## Cómo entregar acceso de forma segura
@@ -21,8 +21,8 @@
 1. Inicia sesión tú mismo cuando el navegador o CLI la abra.
 2. Crea proyectos separados: koda-dev, koda-staging y koda-prod cuando lleguemos a ese punto.
 3. Entrega claves solo por el panel de secretos del servicio o configurándolas localmente; nunca las pegues en chat ni en Git.
-4. Para OpenAI, usa un proyecto propio de KODA, límites de gasto, alertas y una clave con vencimiento. La función de servidor la guardará como secreto.
+4. Para Gemini, usa un proyecto propio de KODA, revisa cuotas y una clave de servidor. La función de Supabase la guardará como secreto bajo `GEMINI_API_KEY`.
 
 La instalación no necesita secretos: [GETTING_STARTED.md](GETTING_STARTED.md).
 
-La APK no contendrá una clave de OpenAI.
+La APK no contendrá una clave de Gemini.

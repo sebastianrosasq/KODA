@@ -102,6 +102,8 @@ function KodaNavigation() {
             ),
           }}
         />
+        <Tabs.Screen name="materials" options={{ href: null }} />
+        <Tabs.Screen name="simulations" options={{ href: null }} />
       </Tabs>
       {hydrated && status === 'signed_in' && !workspace.academicProfileCompleted ? <AcademicOnboardingModal /> : null}
     </ThemeProvider>
