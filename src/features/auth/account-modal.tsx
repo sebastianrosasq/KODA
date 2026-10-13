@@ -102,7 +102,7 @@ export function AccountModal({ onClose, required = false }: { onClose: () => voi
           {!isConfigured ? (
             <View style={[styles.notice, { backgroundColor: theme.accentSoft }]}>
               <Ionicons color={theme.accent} name="cloud-offline-outline" size={19} />
-              <Text style={[styles.noticeText, { color: theme.textSecondary }]}>Supabase aún no está vinculado. Tus datos siguen disponibles solo en este dispositivo.</Text>
+              <Text style={[styles.noticeText, { color: theme.textSecondary }]}>La sincronización de cuenta aún no está disponible. Tus datos siguen en este dispositivo.</Text>
             </View>
           ) : (
             <>

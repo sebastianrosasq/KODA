@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { getCatalogProgram, getProgramsForInstitution, getSuggestedCourses } from '@/data/academic-catalog';
@@ -14,10 +14,9 @@ import {
   KodaPill,
   KodaScreen,
   KodaSectionTitle,
-  KodaText,
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
-import { scheduleStudyReminders } from '@/features/reminders/study-reminders';
+import { getStudyReminderStatus, scheduleStudyReminders, type StudyReminderStatus } from '@/features/reminders/study-reminders';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaData } from '@/providers/koda-data-provider';
@@ -31,9 +30,25 @@ export default function ProfileScreen() {
   const [isAccountModalVisible, setAccountModalVisible] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
+  const [reminderStatus, setReminderStatus] = useState<StudyReminderStatus | null>(null);
   const [isSchedulingReminders, setSchedulingReminders] = useState(false);
   const isDark = colorScheme === 'dark';
   const termLabel = getCatalogProgram(workspace.profile.institutionSlug, workspace.profile.programSlug)?.termLabel ?? 'Ciclo';
+
+  const refreshReminderStatus = useCallback(async () => {
+    try {
+      const nextStatus = await getStudyReminderStatus();
+      setReminderStatus(nextStatus);
+      setReminderMessage(nextStatus.message);
+    } catch {
+      setReminderMessage('No se pudo revisar el estado de los avisos en este dispositivo.');
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => void refreshReminderStatus(), 0);
+    return () => clearTimeout(timer);
+  }, [refreshReminderStatus]);
 
   const submitCourse = () => {
     addCourse(newCourseName);
@@ -47,6 +62,7 @@ export default function ProfileScreen() {
       setReminderMessage(result.status === 'scheduled'
         ? `${result.count} recordatorios semanales actualizados.`
         : result.message);
+      await refreshReminderStatus();
     } catch {
       setReminderMessage('No se pudieron actualizar los recordatorios en este dispositivo.');
     } finally {
@@ -148,7 +164,7 @@ export default function ProfileScreen() {
                 ? session?.user.email
                 : isConfigured
                   ? 'Crea una cuenta para sincronizar tus cursos en varios dispositivos.'
-                  : 'Tu planificación se conserva en este dispositivo hasta conectar Supabase.'}
+                  : 'Tu planificación se conserva en este dispositivo hasta que inicies sesión.'}
             </Text>
           </View>
           <KodaButton
@@ -157,12 +173,6 @@ export default function ProfileScreen() {
             style={styles.accountButton}
             variant={status === 'signed_in' ? 'secondary' : 'primary'}
           />
-        </KodaCard>
-        <KodaCard style={[styles.privacyCard, { backgroundColor: theme.surfaceMuted }]}>
-          <Ionicons color={theme.textSecondary} name="shield-checkmark-outline" size={20} />
-          <KodaText tone="secondary" style={styles.privacyText}>
-            La APK nunca guardará claves de IA ni permisos de administrador. La sincronización usará reglas por estudiante.
-          </KodaText>
         </KodaCard>
         {status === 'signed_in' ? (
           <Text style={[styles.syncText, { color: syncState === 'error' ? theme.warning : theme.textTertiary }]}>
@@ -179,9 +189,13 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.preferenceCopy}>
             <Text style={[styles.preferenceTitle, { color: theme.text }]}>Aviso 15 minutos antes</Text>
-            <Text style={[styles.preferenceText, { color: theme.textSecondary }]}>Se crean recordatorios semanales con los bloques de tu plan actual.</Text>
+            <Text style={[styles.preferenceText, { color: theme.textSecondary }]}>{reminderStatus?.message ?? 'Revisando los avisos de tu plan actual…'}</Text>
           </View>
-          <KodaButton disabled={isSchedulingReminders || !workspace.availability.length} label={isSchedulingReminders ? 'Actualizando…' : 'Activar'} onPress={() => void updateReminders()} />
+          <KodaButton
+            disabled={isSchedulingReminders || !workspace.availability.length || reminderStatus?.status === 'unavailable'}
+            label={isSchedulingReminders ? 'Actualizando…' : reminderStatus?.status === 'active' ? 'Actualizar' : reminderStatus?.status === 'unavailable' ? 'En teléfono' : 'Activar'}
+            onPress={() => void updateReminders()}
+          />
         </KodaCard>
         {reminderMessage ? <Text style={[styles.syncText, { color: theme.textSecondary }]}>{reminderMessage}</Text> : null}
       </KodaReveal>
@@ -292,8 +306,6 @@ const styles = StyleSheet.create({
   accountCard: { gap: KodaSpacing.lg, padding: KodaSpacing.lg },
   accountCopy: { gap: 3 },
   accountButton: { alignSelf: 'flex-start' },
-  privacyCard: { alignItems: 'flex-start', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
-  privacyText: { flex: 1, fontSize: 13, lineHeight: 19 },
   syncText: { fontSize: 12, fontWeight: '600', lineHeight: 17, paddingHorizontal: KodaSpacing.sm },
   reminderCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   modalOverlay: { alignItems: 'center', flex: 1, justifyContent: 'flex-end', padding: KodaSpacing.md },

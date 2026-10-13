@@ -16,7 +16,7 @@ export function KodaAccessGate({ isChecking, isUnavailable }: { isChecking: bool
       </View>
       {isChecking ? <ActivityIndicator color={theme.accent} size="large" /> : null}
       {isUnavailable ? (
-        <Text style={[styles.unavailable, { color: theme.textSecondary }]}>Esta instalación aún no está conectada a Supabase.</Text>
+        <Text style={[styles.unavailable, { color: theme.textSecondary }]}>El acceso a cuentas todavía se está preparando. Reintenta en unos minutos.</Text>
       ) : null}
       {!isChecking && !isUnavailable ? <AccountModal onClose={() => undefined} required /> : null}
     </View>

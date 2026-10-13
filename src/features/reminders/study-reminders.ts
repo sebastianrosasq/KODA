@@ -43,9 +43,47 @@ export type ReminderScheduleResult =
   | { status: 'unavailable'; message: string }
   | { status: 'permission_denied'; message: string };
 
-export async function scheduleStudyReminders(blocks: AvailabilityBlock[]): Promise<ReminderScheduleResult> {
+export type StudyReminderStatus =
+  | { status: 'active'; count: number; message: string }
+  | { status: 'inactive'; message: string }
+  | { status: 'permission_required'; message: string }
+  | { status: 'unavailable'; message: string };
+
+function isKodaStudyReminder(request: Notifications.NotificationRequest) {
+  return request.content.data?.kodaReminder === true;
+}
+
+async function clearKodaStudyReminders() {
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  await Promise.all(
+    scheduled
+      .filter(isKodaStudyReminder)
+      .map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)),
+  );
+}
+
+export async function getStudyReminderStatus(): Promise<StudyReminderStatus> {
   if (Platform.OS === 'web') {
-    return { status: 'unavailable', message: 'Los recordatorios se activan desde la APK para Android o iOS.' };
+    return { status: 'unavailable', message: 'Los avisos se activan cuando instales KODA en tu teléfono.' };
+  }
+
+  const permission = await Notifications.getPermissionsAsync();
+  if (permission.status !== 'granted') {
+    return { status: 'permission_required', message: 'Actívalos una vez para permitir que KODA te avise antes de estudiar.' };
+  }
+
+  const count = (await Notifications.getAllScheduledNotificationsAsync()).filter(isKodaStudyReminder).length;
+  return count
+    ? { status: 'active', count, message: `${count} recordatorios semanales activos.` }
+    : { status: 'inactive', message: 'Actívalos para recibir un aviso 15 minutos antes de cada bloque.' };
+}
+
+export async function scheduleStudyReminders(
+  blocks: AvailabilityBlock[],
+  options: { requestPermission?: boolean } = {},
+): Promise<ReminderScheduleResult> {
+  if (Platform.OS === 'web') {
+    return { status: 'unavailable', message: 'Los avisos se activan cuando instales KODA en tu teléfono.' };
   }
 
   if (Platform.OS === 'android') {
@@ -58,12 +96,14 @@ export async function scheduleStudyReminders(blocks: AvailabilityBlock[]): Promi
   }
 
   const current = await Notifications.getPermissionsAsync();
-  const permission = current.status === 'granted' ? current : await Notifications.requestPermissionsAsync();
+  const permission = current.status === 'granted' || options.requestPermission === false
+    ? current
+    : await Notifications.requestPermissionsAsync();
   if (permission.status !== 'granted') {
     return { status: 'permission_denied', message: 'KODA necesita permiso para avisarte antes de cada bloque.' };
   }
 
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  await clearKodaStudyReminders();
   const activeBlocks = blocks.filter((block) => block.durationMinutes > 0);
   await Promise.all(activeBlocks.map(async (block) => {
     const time = reminderTime(block.startsAt);
@@ -72,7 +112,7 @@ export async function scheduleStudyReminders(blocks: AvailabilityBlock[]): Promi
       content: {
         title: 'Tu bloque de estudio empieza pronto',
         body: `En 15 minutos: ${block.durationMinutes} min para avanzar en tu plan KODA.`,
-        data: { url: '/plan' },
+        data: { url: '/plan', kodaReminder: true },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -85,6 +125,11 @@ export async function scheduleStudyReminders(blocks: AvailabilityBlock[]): Promi
   }));
 
   return { status: 'scheduled', count: activeBlocks.length };
+}
+
+export async function syncStudyRemindersIfPermitted(blocks: AvailabilityBlock[]) {
+  if (Platform.OS === 'web') return;
+  await scheduleStudyReminders(blocks, { requestPermission: false });
 }
 
 export function useStudyReminderNavigation() {

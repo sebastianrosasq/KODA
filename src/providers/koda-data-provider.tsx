@@ -106,6 +106,13 @@ function createEmptyAcademicWorkspace(displayName = 'Estudiante'): KodaWorkspace
   };
 }
 
+function shouldUseAccountName(currentName: string, accountName: string) {
+  const normalizedCurrent = currentName.trim().toLocaleLowerCase();
+  const normalizedAccount = accountName.trim();
+  if (!normalizedAccount) return false;
+  return !normalizedCurrent || ['estudiante', 'sebastián', 'sebastian'].includes(normalizedCurrent);
+}
+
 function normalizeWorkspace(candidate: Partial<KodaWorkspace>): KodaWorkspace {
   const normalized = {
     ...defaultWorkspace,
@@ -176,9 +183,11 @@ function createId(prefix: string) {
 
 export function KodaDataProvider({ children }: { children: ReactNode }) {
   const { session } = useKodaAuth();
-  const sessionDisplayName = typeof session?.user.user_metadata.full_name === 'string'
-    ? session.user.user_metadata.full_name
-    : session?.user.email?.split('@')[0] ?? 'Estudiante';
+  const sessionDisplayName = (() => {
+    const metadata = session?.user.user_metadata as Record<string, unknown> | undefined;
+    const name = [metadata?.full_name, metadata?.name].find((value) => typeof value === 'string' && value.trim());
+    return typeof name === 'string' ? name.trim() : session?.user.email?.split('@')[0] ?? 'Estudiante';
+  })();
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [hydrated, setHydrated] = useState(false);
   const [syncState, setSyncState] = useState<KodaDataContextValue['syncState']>('local');
@@ -256,6 +265,9 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
         const currentWorkspace = remoteWorkspace
           ? normalizeWorkspace(remoteWorkspace)
           : createEmptyAcademicWorkspace(sessionDisplayName);
+        if (shouldUseAccountName(currentWorkspace.profile.displayName, sessionDisplayName)) {
+          currentWorkspace.profile = { ...currentWorkspace.profile, displayName: sessionDisplayName };
+        }
         setCurrentWorkspace(currentWorkspace);
         syncedUserIdRef.current = userId;
         await syncWorkspaceToSupabase(userId, currentWorkspace);

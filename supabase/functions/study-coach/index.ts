@@ -149,7 +149,7 @@ Deno.serve(async (request) => {
             ].join('\n\n'),
           }],
         }],
-        generationConfig: { temperature: 0.35, maxOutputTokens: 700 },
+        generationConfig: { maxOutputTokens: 700 },
       }),
     },
   );

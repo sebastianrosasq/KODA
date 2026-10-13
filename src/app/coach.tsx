@@ -30,6 +30,7 @@ export default function CoachScreen() {
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<CoachMessage[]>([welcomeMessage]);
   const [remainingMessages, setRemainingMessages] = useState<number | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   const analyzedDocuments = useMemo(
     () => documents.filter((document) => document.analysisStatus === 'completed' && document.analysis),
@@ -72,11 +73,12 @@ export default function CoachScreen() {
     const message = prompt.trim();
     if (!message) return;
     if (!hasConsent) {
-      Alert.alert('Confirma el uso de IA', 'Primero confirma que KODA puede enviar tu pregunta a Gemini.');
+      setRequestError('Acepta el uso de IA para activar el chat. Tus preguntas se enviarán a Gemini solo cuando las mandes.');
       return;
     }
 
     const studentMessage: CoachMessage = { id: `student-${Date.now()}`, role: 'student', text: message };
+    setRequestError(null);
     setPrompt('');
     setMessages((current) => [...current, studentMessage]);
     try {
@@ -85,7 +87,13 @@ export default function CoachScreen() {
       setMessages((current) => [...current, { id: `assistant-${Date.now()}`, role: 'assistant', text: reply.answer }]);
       setRemainingMessages(reply.remainingMessages);
     } catch (error) {
-      Alert.alert('KODA no pudo responder', error instanceof Error ? error.message : 'Intenta nuevamente más tarde.');
+      const errorMessage = error instanceof Error ? error.message : 'KODA no pudo responder en este momento.';
+      setRequestError(errorMessage);
+      setMessages((current) => [...current, {
+        id: `assistant-error-${Date.now()}`,
+        role: 'assistant',
+        text: `Aún no puedo responder esta consulta. ${errorMessage}`,
+      }]);
     } finally {
       setSending(false);
     }
@@ -149,6 +157,8 @@ export default function CoachScreen() {
         ) : null}
       </View>
 
+      {requestError ? <Text style={[styles.requestError, { color: theme.warning }]}>{requestError}</Text> : null}
+
       <KodaCard style={styles.composer}>
         <TextInput
           accessibilityLabel="Pregunta para KODA"
@@ -163,7 +173,7 @@ export default function CoachScreen() {
           value={prompt}
         />
         <View style={styles.composerFooter}>
-          <Text style={[styles.quota, { color: theme.textTertiary }]}>{remainingMessages === null ? 'Hasta 8 mensajes de IA al día' : `${remainingMessages} mensajes de IA restantes hoy`}</Text>
+          <Text style={[styles.quota, { color: theme.textTertiary }]}>{hasConsent ? (remainingMessages === null ? 'Hasta 8 mensajes de IA al día' : `${remainingMessages} mensajes de IA restantes hoy`) : 'Acepta el aviso de IA para activar el chat.'}</Text>
           <KodaButton disabled={isSending || !prompt.trim() || !hasConsent} icon="send-outline" label={isSending ? 'Enviando…' : 'Enviar'} onPress={() => void submit()} />
         </View>
       </KodaCard>
@@ -193,4 +203,5 @@ const styles = StyleSheet.create({
   input: { fontSize: 15, fontWeight: '600', lineHeight: 22, minHeight: 76, padding: KodaSpacing.xs },
   composerFooter: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm, justifyContent: 'space-between' },
   quota: { flex: 1, fontSize: 11, fontWeight: '700', lineHeight: 16 },
+  requestError: { fontSize: 12, fontWeight: '700', lineHeight: 18 },
 });

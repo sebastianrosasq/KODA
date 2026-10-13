@@ -26,6 +26,7 @@ export default function ReviewScreen() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [cardOffset, setCardOffset] = useState(0);
   const [isCreateVisible, setCreateVisible] = useState(false);
+  const [createCourseId, setCreateCourseId] = useState<string | undefined>();
   const pendingCards = useMemo(
     () => workspace.flashcards.slice().sort((left, right) => left.mastery - right.mastery),
     [workspace.flashcards],
@@ -54,7 +55,7 @@ export default function ReviewScreen() {
         eyebrow="Repaso activo"
         title="Haz que se te quede"
         subtitle="Recuperar una idea es más útil que releerla. Tus tarjetas también se sincronizan con tu cuenta."
-        right={<KodaIconButton icon="add" label="Crear flashcard" onPress={() => setCreateVisible(true)} />}
+        right={<KodaIconButton icon="add" label="Crear flashcard" onPress={() => { setCreateCourseId(undefined); setCreateVisible(true); }} />}
       />
 
       <KodaCard style={[styles.streakCard, { backgroundColor: theme.surfaceMuted }]}>
@@ -68,7 +69,7 @@ export default function ReviewScreen() {
       </KodaCard>
 
       <View style={styles.sectionBlock}>
-        <KodaSectionTitle title="Una tarjeta para empezar" action="Crear" onActionPress={() => setCreateVisible(true)} />
+        <KodaSectionTitle title="Una tarjeta para empezar" action="Crear" onActionPress={() => { setCreateCourseId(undefined); setCreateVisible(true); }} />
         {card ? (
           <>
             <Pressable
@@ -102,7 +103,7 @@ export default function ReviewScreen() {
               <Text style={[styles.emptyTitle, { color: theme.text }]}>Tu primer mazo empieza aquí</Text>
               <KodaText tone="secondary">Crea una pregunta breve con una respuesta clara para cada idea importante.</KodaText>
             </View>
-            <KodaButton label="Crear" onPress={() => setCreateVisible(true)} />
+            <KodaButton label="Crear" onPress={() => { setCreateCourseId(undefined); setCreateVisible(true); }} />
           </KodaCard>
         )}
       </View>
@@ -117,8 +118,9 @@ export default function ReviewScreen() {
               </View>
               <View style={styles.deckCopy}>
                 <Text style={[styles.deckName, { color: theme.text }]}>{course.name}</Text>
-                <Text style={[styles.deckDetail, { color: theme.textSecondary }]}>{due} pendientes · {cards.length} tarjetas</Text>
+                <Text style={[styles.deckDetail, { color: theme.textSecondary }]}>{cards.length ? `${due} pendientes · ${cards.length} tarjetas` : 'Aún no hay tarjetas para este curso.'}</Text>
               </View>
+              {!cards.length ? <KodaButton label="Crear" onPress={() => { setCreateCourseId(course.id); setCreateVisible(true); }} variant="secondary" /> : null}
             </KodaCard>
           ))}
         </View>
@@ -146,17 +148,17 @@ export default function ReviewScreen() {
         <KodaButton icon="sparkles-outline" label="Materiales" onPress={() => router.push('/materials')} variant="secondary" />
       </KodaCard>
 
-      {isCreateVisible ? <FlashcardModal onClose={() => setCreateVisible(false)} onCreate={addFlashcard} /> : null}
+      {isCreateVisible ? <FlashcardModal initialCourseId={createCourseId} onClose={() => setCreateVisible(false)} onCreate={addFlashcard} /> : null}
     </KodaScreen>
   );
 }
 
-function FlashcardModal({ onClose, onCreate }: { onClose: () => void; onCreate: (card: { courseId: string; prompt: string; answer: string }) => void }) {
+function FlashcardModal({ initialCourseId, onClose, onCreate }: { initialCourseId?: string; onClose: () => void; onCreate: (card: { courseId: string; prompt: string; answer: string }) => void }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
   const { workspace } = useKodaData();
   const availableCourses = workspace.courses.filter((course) => course.isActive);
-  const [courseId, setCourseId] = useState(availableCourses[0]?.id ?? '');
+  const [courseId, setCourseId] = useState(availableCourses.some((course) => course.id === initialCourseId) ? initialCourseId! : availableCourses[0]?.id ?? '');
   const [prompt, setPrompt] = useState('');
   const [answer, setAnswer] = useState('');
 

@@ -191,13 +191,28 @@ function createStoragePath(userId: string, extension: string) {
 
 export function friendlyFunctionError(error: unknown, fallback = 'No se pudo completar la solicitud de IA.') {
   if (!error || typeof error !== 'object') return fallback;
-  const candidate = error as { message?: unknown; context?: { json?: () => Promise<unknown> } };
+  const candidate = error as {
+    message?: unknown;
+    context?: { json?: () => Promise<unknown>; text?: () => Promise<string> };
+  };
+
+  const userMessage = (value: unknown) => {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    if (value.includes('La IA aún no está configurada')) {
+      return 'La asistencia con IA se está preparando. Tu material puede guardarse mientras tanto.';
+    }
+    return value.trim();
+  };
+
   if (candidate.context?.json) {
     return candidate.context.json()
-      .then((body) => typeof body === 'object' && body && 'error' in body && typeof body.error === 'string' ? body.error : '')
-      .catch(() => '');
+      .then((body) => typeof body === 'object' && body && 'error' in body ? userMessage(body.error) : '')
+      .catch(async () => {
+        if (!candidate.context?.text) return '';
+        return userMessage(await candidate.context.text().catch(() => ''));
+      });
   }
-  return Promise.resolve(typeof candidate.message === 'string' ? candidate.message : fallback);
+  return Promise.resolve(userMessage(candidate.message) || fallback);
 }
 
 export async function listStudyDocuments() {
@@ -234,10 +249,10 @@ export async function recordAiDocumentConsent() {
   if (error) throw new Error(error.message);
 }
 
-export async function uploadAndAnalyzeStudyDocument({ asset, courseId }: { asset: DocumentPickerAsset; courseId: string }) {
+export async function uploadStudyDocument({ asset, courseId }: { asset: DocumentPickerAsset; courseId: string }) {
   const client = clientOrThrow();
   const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError || !userData.user) throw new Error('Inicia sesión para analizar un material.');
+  if (userError || !userData.user) throw new Error('Inicia sesión para guardar un material.');
   const descriptor = getAssetDescriptor(asset);
 
   const file = await readAsset(asset);
@@ -268,8 +283,7 @@ export async function uploadAndAnalyzeStudyDocument({ asset, courseId }: { asset
     throw new Error(uploadError.message);
   }
 
-  const analysis = await analyzeStudyDocument(document.id);
-  return { documentId: document.id, analysis };
+  return { documentId: document.id };
 }
 
 export async function analyzeStudyDocument(documentId: string) {

@@ -211,7 +211,13 @@ Deno.serve(async (request) => {
   if (!document.storage_path.startsWith(`${userData.user.id}/`)) return json({ error: 'Documento no autorizado.' }, 403);
 
   const apiKey = Deno.env.get('GEMINI_API_KEY');
-  if (!apiKey) return json({ error: 'La IA aún no está configurada para este entorno.' }, 503);
+  if (!apiKey) {
+    await markDocument(adminClient, document.id, {
+      analysis_status: 'failed',
+      last_error: 'La asistencia con IA todavía se está preparando. Tu material sigue guardado y podrás reintentarlo.',
+    });
+    return json({ error: 'La IA aún no está configurada para este entorno.' }, 503);
+  }
 
   const { data: material, error: downloadError } = await client.storage.from(DOCUMENT_BUCKET).download(document.storage_path);
   if (downloadError || !material || !supportedMimeTypes.has(document.mime_type) || material.size > MAX_STUDY_MATERIAL_BYTES) {
@@ -259,7 +265,6 @@ Deno.serve(async (request) => {
           ],
         }],
         generationConfig: {
-          temperature: 0.2,
           maxOutputTokens: 2200,
           responseMimeType: 'application/json',
           responseJsonSchema: studySchema,

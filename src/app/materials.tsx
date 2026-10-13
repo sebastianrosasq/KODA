@@ -12,7 +12,7 @@ import {
   markDocumentFlashcardsImported,
   recordAiDocumentConsent,
   type StudyDocument,
-  uploadAndAnalyzeStudyDocument,
+  uploadStudyDocument,
 } from '@/features/ai/study-documents';
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaScreen, KodaSectionTitle } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
@@ -32,6 +32,7 @@ export default function MaterialsScreen() {
   const [isConsenting, setConsenting] = useState(false);
   const [importingId, setImportingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const selectedCourseId = courses.some((course) => course.id === courseId) ? courseId : courses[0]?.id ?? '';
 
   const loadDocuments = useCallback(async () => {
@@ -62,13 +63,9 @@ export default function MaterialsScreen() {
     }
   };
 
-  const chooseAndAnalyze = async () => {
+  const chooseAndUpload = async () => {
     if (status !== 'signed_in') {
       Alert.alert('Inicia sesión', 'Necesitas una cuenta para guardar y proteger tus materiales.');
-      return;
-    }
-    if (!hasConsent) {
-      Alert.alert('Confirma el uso de IA', 'Lee y acepta el aviso antes de enviar un PDF o audio para análisis.');
       return;
     }
     if (!selectedCourseId) {
@@ -96,11 +93,24 @@ export default function MaterialsScreen() {
 
     try {
       setLoading(true);
-      await uploadAndAnalyzeStudyDocument({ asset: result.assets[0], courseId: selectedCourseId });
+      setFeedback(null);
+      const { documentId } = await uploadStudyDocument({ asset: result.assets[0], courseId: selectedCourseId });
       await loadDocuments();
-      Alert.alert('Análisis listo', 'Revisa el resumen, guarda las tarjetas que quieras y practica con el simulacro.');
+      if (!hasConsent) {
+        setFeedback('Material guardado. Acepta el uso de IA cuando quieras convertirlo en resumen, tarjetas y práctica.');
+        return;
+      }
+
+      try {
+        await analyzeStudyDocument(documentId);
+        await loadDocuments();
+        setFeedback('Análisis listo. Revisa el resumen, guarda las tarjetas que quieras y practica.');
+      } catch (error) {
+        await loadDocuments();
+        setFeedback(`Tu material se guardó. ${error instanceof Error ? error.message : 'El análisis podrá reintentarse más tarde.'}`);
+      }
     } catch (error) {
-      Alert.alert('No se pudo analizar el material', error instanceof Error ? error.message : 'Intenta nuevamente más tarde.');
+      setFeedback(error instanceof Error ? error.message : 'No se pudo guardar el material. Intenta nuevamente más tarde.');
       await loadDocuments();
     } finally {
       setLoading(false);
@@ -124,13 +134,17 @@ export default function MaterialsScreen() {
   };
 
   const retryAnalysis = async (document: StudyDocument) => {
+    if (!hasConsent) {
+      setFeedback('Acepta el uso de IA antes de analizar este material. El archivo ya está guardado de forma privada.');
+      return;
+    }
     try {
       setRetryingId(document.id);
       await analyzeStudyDocument(document.id);
       await loadDocuments();
-      Alert.alert('Análisis listo', 'Ya puedes revisar el resumen, guardar tarjetas o practicar.');
+      setFeedback('Análisis listo. Ya puedes revisar el resumen, guardar tarjetas o practicar.');
     } catch (error) {
-      Alert.alert('No se pudo analizar el material', error instanceof Error ? error.message : 'Intenta nuevamente más tarde.');
+      setFeedback(error instanceof Error ? error.message : 'No se pudo analizar el material. Intenta nuevamente más tarde.');
       await loadDocuments();
     } finally {
       setRetryingId(null);
@@ -195,19 +209,20 @@ export default function MaterialsScreen() {
         <KodaCard style={styles.consentCard}>
           <View style={styles.consentCopy}>
             <Text style={[styles.consentTitle, { color: theme.text }]}>Antes de continuar</Text>
-          <Text style={[styles.consentDetail, { color: theme.textSecondary }]}>Acepto que KODA envíe este PDF o audio a Gemini para generar material de estudio. La IA puede equivocarse y debo verificar el resultado.</Text>
+          <Text style={[styles.consentDetail, { color: theme.textSecondary }]}>Acepto que KODA envíe este PDF o audio a Gemini para generar material de estudio. Puedes guardar materiales privados antes de aceptar. La IA puede equivocarse y debo verificar el resultado.</Text>
           </View>
           <KodaButton disabled={isConsenting} icon="checkmark-circle-outline" label={isConsenting ? 'Guardando…' : 'Acepto y continuar'} onPress={() => void acceptConsent()} />
         </KodaCard>
       ) : null}
 
       <View style={styles.sectionBlock}>
-        <KodaSectionTitle title="Analizar un PDF o audio" />
+        <KodaSectionTitle title="Guardar un PDF o audio" />
         <View style={styles.pills}>
           {courses.map((course) => <KodaPill key={course.id} label={course.name} selected={course.id === selectedCourseId} onPress={() => setCourseId(course.id)} />)}
         </View>
-        <KodaButton disabled={isLoading || !hasConsent || status !== 'signed_in' || !selectedCourseId} icon="cloud-upload-outline" label={isLoading ? 'Analizando tu material…' : 'Elegir PDF o audio · hasta 12 MB'} onPress={() => void chooseAndAnalyze()} />
-        <Text style={[styles.limitText, { color: theme.textTertiary }]}>Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Límite inicial: 2 análisis diarios.</Text>
+        <KodaButton disabled={isLoading || status !== 'signed_in' || !selectedCourseId} icon="cloud-upload-outline" label={isLoading ? 'Guardando tu material…' : 'Elegir PDF o audio · hasta 12 MB'} onPress={() => void chooseAndUpload()} />
+        <Text style={[styles.limitText, { color: theme.textTertiary }]}>Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Al aceptar IA tendrás hasta 2 análisis diarios.</Text>
+        {feedback ? <Text style={[styles.feedbackText, { color: theme.textSecondary }]}>{feedback}</Text> : null}
       </View>
 
       <View style={styles.sectionBlock}>
@@ -295,7 +310,7 @@ export default function MaterialsScreen() {
 }
 
 function statusLabel(status: StudyDocument['analysisStatus']) {
-  return { ready: 'listo para analizar', processing: 'analizando', completed: 'análisis listo', failed: 'requiere atención' }[status];
+  return { ready: 'guardado · pendiente de análisis', processing: 'analizando', completed: 'análisis listo', failed: 'requiere atención' }[status];
 }
 
 const styles = StyleSheet.create({
@@ -318,6 +333,7 @@ const styles = StyleSheet.create({
   sectionBlock: { gap: KodaSpacing.md },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: KodaSpacing.sm },
   limitText: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  feedbackText: { fontSize: 12, fontWeight: '700', lineHeight: 18 },
   documentCard: { gap: KodaSpacing.lg, padding: KodaSpacing.lg },
   documentHeader: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md },
   documentIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },

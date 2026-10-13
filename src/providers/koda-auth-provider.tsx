@@ -60,20 +60,20 @@ export function KodaAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    if (!supabase) return 'Conecta el proyecto Supabase para habilitar el acceso.';
+    if (!supabase) return 'El acceso a cuentas no está disponible en esta versión.';
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     return error?.message ?? null;
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    if (!supabase) return 'Conecta el proyecto Supabase para habilitar el registro.';
+    if (!supabase) return 'El registro todavía no está disponible en esta versión.';
     const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
     if (error) return error.message;
     return data.session ? null : 'Revisa tu correo para confirmar la cuenta antes de iniciar sesión.';
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
-    if (!supabase) return 'Conecta el proyecto Supabase para habilitar el acceso.';
+    if (!supabase) return 'El acceso a cuentas no está disponible en esta versión.';
 
     // Evita navegar a la respuesta JSON de Supabase cuando el administrador aún
     // no habilitó Google. La clave publishable es segura para consultar ajustes públicos.

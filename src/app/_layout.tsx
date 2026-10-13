@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DarkTheme, DefaultTheme, Tabs, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 
 import { KodaAuthProvider, useKodaAuth } from '@/providers/koda-auth-provider';
 import { KodaDataProvider, useKodaData } from '@/providers/koda-data-provider';
 import { KodaThemeProvider, useKodaTheme } from '@/providers/koda-theme-provider';
-import { useStudyReminderNavigation } from '@/features/reminders/study-reminders';
+import { syncStudyRemindersIfPermitted, useStudyReminderNavigation } from '@/features/reminders/study-reminders';
 import { AcademicOnboardingModal } from '@/features/onboarding/academic-onboarding-modal';
 import { KodaAccessGate } from '@/features/auth/koda-access-gate';
 
@@ -26,6 +27,11 @@ function KodaNavigation() {
   const { status } = useKodaAuth();
   const { hydrated, workspace } = useKodaData();
   useStudyReminderNavigation();
+  const availabilityKey = workspace.availability.map((block) => `${block.id}:${block.day}:${block.startsAt}:${block.durationMinutes}`).join('|');
+  useEffect(() => {
+    if (status !== 'signed_in' || !hydrated || !workspace.academicProfileCompleted) return;
+    void syncStudyRemindersIfPermitted(workspace.availability);
+  }, [availabilityKey, hydrated, status, workspace.academicProfileCompleted, workspace.availability]);
   const baseTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
     ...baseTheme,
