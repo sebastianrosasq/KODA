@@ -18,10 +18,33 @@ export function AccountModal({ onClose, required = false }: { onClose: () => voi
   const [loading, setLoading] = useState(false);
 
   const submit = async (mode: 'signIn' | 'signUp') => {
-    setLoading(true);
-    const result = mode === 'signIn' ? await signIn(email, password) : await signUp(email, password);
-    setLoading(false);
-    setMessage(result ?? (mode === 'signIn' ? 'Sesión iniciada.' : 'Cuenta creada. Revisa tu correo si requiere confirmación.'));
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setMessage('Escribe tu correo electrónico para continuar.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setMessage('Escribe un correo electrónico válido.');
+      return;
+    }
+    if (!password) {
+      setMessage('Escribe tu contraseña para continuar.');
+      return;
+    }
+    if (mode === 'signUp' && password.length < 6) {
+      setMessage('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = mode === 'signIn' ? await signIn(normalizedEmail, password) : await signUp(normalizedEmail, password);
+      setMessage(result ?? (mode === 'signIn' ? 'Sesión iniciada.' : 'Cuenta creada. Revisa tu correo si requiere confirmación.'));
+    } catch {
+      setMessage('No se pudo conectar con el acceso. Revisa tu conexión e inténtalo nuevamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const submitGoogle = async () => {
@@ -69,7 +92,10 @@ export function AccountModal({ onClose, required = false }: { onClose: () => voi
                 autoComplete="email"
                 autoCorrect={false}
                 keyboardType="email-address"
-                onChangeText={setEmail}
+                onChangeText={(value) => {
+                  setEmail(value);
+                  setMessage(null);
+                }}
                 placeholder="correo@ejemplo.com"
                 placeholderTextColor={theme.textTertiary}
                 style={[styles.input, { borderColor: theme.border, color: theme.text }]}
@@ -79,7 +105,10 @@ export function AccountModal({ onClose, required = false }: { onClose: () => voi
                 accessibilityLabel="Contraseña"
                 autoCapitalize="none"
                 autoComplete="password"
-                onChangeText={setPassword}
+                onChangeText={(value) => {
+                  setPassword(value);
+                  setMessage(null);
+                }}
                 placeholder="Contraseña"
                 placeholderTextColor={theme.textTertiary}
                 secureTextEntry
