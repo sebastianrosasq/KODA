@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DarkTheme, DefaultTheme, Tabs, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { View } from 'react-native';
 
 import { KodaAuthProvider, useKodaAuth } from '@/providers/koda-auth-provider';
 import { KodaDataProvider, useKodaData } from '@/providers/koda-data-provider';
@@ -44,6 +45,16 @@ function KodaNavigation() {
       <ThemeProvider value={navigationTheme}>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <KodaAccessGate isChecking={status === 'checking'} isUnavailable={status === 'unavailable'} />
+      </ThemeProvider>
+    );
+  }
+
+  if (!hydrated || !workspace.academicProfileCompleted) {
+    return (
+      <ThemeProvider value={navigationTheme}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <View style={{ backgroundColor: theme.background, flex: 1 }} />
+        {hydrated ? <AcademicOnboardingModal /> : null}
       </ThemeProvider>
     );
   }
@@ -116,7 +127,6 @@ function KodaNavigation() {
         <Tabs.Screen name="simulations" options={{ href: null }} />
         <Tabs.Screen name="coach" options={{ href: null }} />
       </Tabs>
-      {hydrated && !workspace.academicProfileCompleted ? <AcademicOnboardingModal /> : null}
     </ThemeProvider>
   );
 }
