@@ -20,7 +20,7 @@ import { useKodaData } from '@/providers/koda-data-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 import type { CourseTone, DayLabel } from '@/types/koda-domain';
 
-const days: DayLabel[] = ['Hoy', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const days: DayLabel[] = ['Hoy', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 export default function PlanScreen() {
   const { theme } = useKodaTheme();

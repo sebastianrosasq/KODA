@@ -34,7 +34,7 @@ export type StudyTopic = {
   completed: boolean;
 };
 
-export type DayLabel = 'Hoy' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
+export type DayLabel = 'Hoy' | 'Lun' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
 
 export type AvailabilityBlock = {
   id: string;

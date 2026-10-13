@@ -170,6 +170,7 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
   const [programSlug, setProgramSlug] = useState(workspace.profile.programSlug);
   const selectedProgram = programs.find((program) => program.slug === programSlug) ?? programs[0];
   const [term, setTerm] = useState(workspace.profile.currentTerm);
+  const [isSaving, setSaving] = useState(false);
 
   const selectInstitution = (slug: string) => {
     const nextPrograms = getProgramsForInstitution(slug);
@@ -178,9 +179,10 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
     setTerm(1);
   };
 
-  const saveProfile = () => {
+  const saveProfile = async () => {
     const institution = catalogInstitutions.find((item) => item.slug === institutionSlug);
     if (!institution || !selectedProgram) return;
+    setSaving(true);
     updateProfile({
       displayName: workspace.profile.displayName,
       institutionSlug,
@@ -189,7 +191,9 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
       programName: selectedProgram.name,
       currentTerm: term,
     });
-    preloadCourses(getSuggestedCourses(institutionSlug, selectedProgram.slug, term));
+    const suggestedCourses = await getSuggestedCourses(institutionSlug, selectedProgram.slug, term);
+    preloadCourses(suggestedCourses);
+    setSaving(false);
     onClose();
   };
 
@@ -229,7 +233,7 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
                 <KodaPill key={number} label={String(number)} onPress={() => setTerm(number)} selected={number === term} />
               ))}
             </View>
-            <KodaButton label="Guardar y sugerir cursos" icon="sparkles-outline" onPress={saveProfile} />
+            <KodaButton disabled={isSaving} label={isSaving ? 'Consultando malla…' : 'Guardar y sugerir cursos'} icon="sparkles-outline" onPress={() => void saveProfile()} />
           </ScrollView>
         </Pressable>
       </Pressable>

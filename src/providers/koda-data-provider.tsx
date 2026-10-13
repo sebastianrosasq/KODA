@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { getDaysUntilExam, generateStudyPlan } from '@/features/planner/generate-study-plan';
+import { loadWorkspaceFromSupabase, syncWorkspaceToSupabase } from '@/features/workspace/supabase-workspace';
+import { useKodaAuth } from '@/providers/koda-auth-provider';
 import type {
   AvailabilityBlock,
   CourseTone,
@@ -59,6 +61,8 @@ const defaultWorkspace: KodaWorkspace = {
 
 type KodaDataContextValue = {
   hydrated: boolean;
+  syncState: 'local' | 'syncing' | 'synced' | 'error';
+  syncError: string | null;
   workspace: KodaWorkspace;
   plan: ReturnType<typeof generateStudyPlan>;
   updateProfile: (profile: StudentAcademicProfile) => void;
@@ -90,8 +94,24 @@ function createId(prefix: string) {
 }
 
 export function KodaDataProvider({ children }: { children: ReactNode }) {
+  const { session } = useKodaAuth();
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [hydrated, setHydrated] = useState(false);
+  const [syncState, setSyncState] = useState<KodaDataContextValue['syncState']>('local');
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const workspaceRef = useRef(workspace);
+  const syncQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const syncedUserIdRef = useRef<string | null>(null);
+
+  const saveLocalWorkspace = useCallback((next: KodaWorkspace) => {
+    void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => undefined);
+  }, []);
+
+  const setCurrentWorkspace = useCallback((next: KodaWorkspace) => {
+    workspaceRef.current = next;
+    setWorkspace(next);
+    saveLocalWorkspace(next);
+  }, [saveLocalWorkspace]);
 
   useEffect(() => {
     let active = true;
@@ -99,7 +119,9 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     void AsyncStorage.getItem(STORAGE_KEY)
       .then((storedWorkspace) => {
         if (!storedWorkspace || !active) return;
-        setWorkspace(JSON.parse(storedWorkspace) as KodaWorkspace);
+        const restored = JSON.parse(storedWorkspace) as KodaWorkspace;
+        workspaceRef.current = restored;
+        setWorkspace(restored);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -111,13 +133,66 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const enqueueRemoteSync = useCallback((next: KodaWorkspace) => {
+    const userId = session?.user.id;
+    if (!userId || syncedUserIdRef.current !== userId) return;
+
+    syncQueueRef.current = syncQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (syncedUserIdRef.current !== userId) return;
+        setSyncState('syncing');
+        setSyncError(null);
+        await syncWorkspaceToSupabase(userId, next);
+        if (syncedUserIdRef.current === userId) setSyncState('synced');
+      })
+      .catch((error: unknown) => {
+        if (syncedUserIdRef.current !== userId) return;
+        setSyncState('error');
+        setSyncError(error instanceof Error ? error.message : 'No se pudo sincronizar tu espacio.');
+      });
+  }, [session?.user.id]);
+
+  useEffect(() => {
+    const userId = session?.user.id;
+    if (!hydrated || !userId) {
+      syncedUserIdRef.current = null;
+      const resetState = setTimeout(() => {
+        setSyncState('local');
+        setSyncError(null);
+      }, 0);
+      return () => clearTimeout(resetState);
+    }
+
+    let active = true;
+
+    void loadWorkspaceFromSupabase(userId, workspaceRef.current)
+      .then(async (remoteWorkspace) => {
+        if (!active) return;
+        if (remoteWorkspace) {
+          setCurrentWorkspace(remoteWorkspace);
+        }
+        syncedUserIdRef.current = userId;
+        await syncWorkspaceToSupabase(userId, remoteWorkspace ?? workspaceRef.current);
+        if (active) setSyncState('synced');
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setSyncState('error');
+        setSyncError(error instanceof Error ? error.message : 'No se pudo iniciar la sincronización.');
+      });
+
+    return () => {
+      active = false;
+      if (syncedUserIdRef.current === userId) syncedUserIdRef.current = null;
+    };
+  }, [hydrated, session?.user.id, setCurrentWorkspace]);
+
   const updateWorkspace = useCallback((updater: (current: KodaWorkspace) => KodaWorkspace) => {
-    setWorkspace((current) => {
-      const next = updater(current);
-      void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => undefined);
-      return next;
-    });
-  }, []);
+    const next = updater(workspaceRef.current);
+    setCurrentWorkspace(next);
+    enqueueRemoteSync(next);
+  }, [enqueueRemoteSync, setCurrentWorkspace]);
 
   const updateProfile = useCallback((profile: StudentAcademicProfile) => {
     updateWorkspace((current) => ({ ...current, profile }));
@@ -249,6 +324,8 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       hydrated,
+      syncState,
+      syncError,
       workspace,
       plan,
       updateProfile,
@@ -278,6 +355,8 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       updateAvailability,
       updateProfile,
       workspace,
+      syncError,
+      syncState,
     ],
   );
 
