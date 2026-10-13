@@ -69,6 +69,7 @@ function KodaNavigation() {
     <ThemeProvider value={navigationTheme}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       <Tabs
+        detachInactiveScreens
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: theme.accent,

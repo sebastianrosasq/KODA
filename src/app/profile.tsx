@@ -39,7 +39,7 @@ export default function ProfileScreen() {
     try {
       const nextStatus = await getStudyReminderStatus();
       setReminderStatus(nextStatus);
-      setReminderMessage(nextStatus.message);
+      setReminderMessage(null);
     } catch {
       setReminderMessage('No se pudo revisar el estado de los avisos en este dispositivo.');
     }

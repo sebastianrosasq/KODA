@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 
 import {
   analyzeStudyDocument,
@@ -28,6 +28,7 @@ export default function MaterialsScreen() {
   const [courseId, setCourseId] = useState('');
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
   const [isLoading, setLoading] = useState(false);
+  const [isLoadingDocuments, setLoadingDocuments] = useState(true);
   const [hasConsent, setHasConsent] = useState(false);
   const [isConsenting, setConsenting] = useState(false);
   const [importingId, setImportingId] = useState<string | null>(null);
@@ -36,13 +37,19 @@ export default function MaterialsScreen() {
   const selectedCourseId = courses.some((course) => course.id === courseId) ? courseId : courses[0]?.id ?? '';
 
   const loadDocuments = useCallback(async () => {
-    if (status !== 'signed_in') return;
+    if (status !== 'signed_in') {
+      setLoadingDocuments(false);
+      return;
+    }
     try {
+      setLoadingDocuments(true);
       const [nextDocuments, consent] = await Promise.all([listStudyDocuments(), getAiDocumentConsent()]);
       setDocuments(nextDocuments);
       setHasConsent(consent);
     } catch (error) {
       console.warn('No se pudieron cargar los materiales', error);
+    } finally {
+      setLoadingDocuments(false);
     }
   }, [status]);
 
@@ -205,7 +212,7 @@ export default function MaterialsScreen() {
         </KodaCard>
       ) : null}
 
-      {!hasConsent && status === 'signed_in' ? (
+      {!isLoadingDocuments && !hasConsent && status === 'signed_in' ? (
         <KodaCard style={styles.consentCard}>
           <View style={styles.consentCopy}>
             <Text style={[styles.consentTitle, { color: theme.text }]}>Antes de continuar</Text>
@@ -227,7 +234,15 @@ export default function MaterialsScreen() {
 
       <View style={styles.sectionBlock}>
         <KodaSectionTitle title="Tus análisis" />
-        {documents.length ? documents.map((document) => {
+        {isLoadingDocuments ? (
+          <KodaCard style={styles.emptyCard}>
+            <ActivityIndicator accessibilityLabel="Cargando tus materiales" color={theme.accent} />
+            <View style={styles.emptyCopy}>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>Cargando tus materiales</Text>
+              <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>Estamos recuperando tus análisis privados.</Text>
+            </View>
+          </KodaCard>
+        ) : documents.length ? documents.map((document) => {
           const course = courses.find((item) => item.id === document.courseId);
           return (
             <KodaCard key={document.id} style={styles.documentCard}>

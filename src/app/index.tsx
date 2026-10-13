@@ -23,6 +23,8 @@ export default function HomeScreen() {
   const { theme } = useKodaTheme();
   const { completeSession, dashboard, plan, workspace } = useKodaData();
   const todaySessions = plan.filter((session) => session.day === 'Hoy');
+  const hasExam = Boolean(dashboard.nextExam);
+  const hasAvailability = workspace.availability.length > 0;
   const nextExam = dashboard.nextExam ?? {
     course: 'Añade tu primer examen',
     topic: 'KODA organizará los temas y bloques que necesites.',
@@ -32,6 +34,13 @@ export default function HomeScreen() {
   };
   const { courseProgress } = dashboard;
   const termLabel = getCatalogProgram(workspace.profile.institutionSlug, workspace.profile.programSlug)?.termLabel ?? 'Ciclo';
+  const homeSubtitle = todaySessions.length
+    ? 'Hoy tienes bloques listos para avanzar sin saturarte.'
+    : !hasAvailability
+      ? 'Registra tus horas disponibles para que KODA organice una semana que sí puedas cumplir.'
+      : !hasExam
+        ? 'Añade tu primer examen para que KODA pueda priorizar tus horas de estudio.'
+        : 'Aún no tienes bloques para hoy. Revisa tu plan y ajusta tu semana si hace falta.';
 
   const toneColor = {
     plum: theme.accent,
@@ -56,7 +65,7 @@ export default function HomeScreen() {
         <KodaPageHeader
           eyebrow="Semana de exámenes"
           title={'Hola, ' + workspace.profile.displayName}
-          subtitle="Hoy tienes tiempo suficiente para avanzar sin saturarte."
+          subtitle={homeSubtitle}
         />
       </KodaReveal>
 
@@ -64,34 +73,38 @@ export default function HomeScreen() {
         <KodaCard style={[styles.examCard, { backgroundColor: theme.accent, borderColor: theme.accent }]}>
           <View style={styles.examTopRow}>
           <View style={styles.examCopy}>
-            <Text style={[styles.examEyebrow, { color: theme.onAccent }]}>PRÓXIMO EXAMEN</Text>
+            <Text style={[styles.examEyebrow, { color: theme.onAccent }]}>{hasExam ? 'PRÓXIMO EXAMEN' : 'EMPIEZA TU PLAN'}</Text>
             <Text style={[styles.examCourse, { color: theme.onAccent }]}>{nextExam.course}</Text>
             <Text style={[styles.examTopic, { color: theme.onAccent }]}>{nextExam.topic}</Text>
           </View>
           <View style={[styles.daysBadge, { backgroundColor: theme.onAccent }]}>
-            <Text style={[styles.daysNumber, { color: theme.accent }]}>{nextExam.remaining.split(' ')[0]}</Text>
-            <Text style={[styles.daysLabel, { color: theme.accent }]}>{nextExam.remaining === '—' ? 'fecha' : 'días'}</Text>
+            <Text style={[styles.daysNumber, { color: theme.accent }]}>{hasExam ? nextExam.remaining.split(' ')[0] : '+'}</Text>
+            <Text style={[styles.daysLabel, { color: theme.accent }]}>{hasExam ? 'días' : 'examen'}</Text>
           </View>
           </View>
 
           <View style={styles.examFooter}>
-          <View style={styles.preparationRow}>
-            <Text style={[styles.preparationLabel, { color: theme.onAccent }]}>Preparación</Text>
-            <Text style={[styles.preparationValue, { color: theme.onAccent }]}>{nextExam.preparation}%</Text>
-          </View>
-          <View style={[styles.heroTrack, { backgroundColor: 'rgba(255,255,255,0.28)' }]}>
-            <View
-              style={[
-                styles.heroProgress,
-                {
-                  backgroundColor: theme.onAccent,
-                  width: nextExam.preparation + '%' as `${number}%`,
-                },
-              ]}
-            />
-          </View>
+          {hasExam ? (
+            <>
+              <View style={styles.preparationRow}>
+                <Text style={[styles.preparationLabel, { color: theme.onAccent }]}>Preparación</Text>
+                <Text style={[styles.preparationValue, { color: theme.onAccent }]}>{nextExam.preparation}%</Text>
+              </View>
+              <View style={[styles.heroTrack, { backgroundColor: 'rgba(255,255,255,0.28)' }]}>
+                <View
+                  style={[
+                    styles.heroProgress,
+                    {
+                      backgroundColor: theme.onAccent,
+                      width: nextExam.preparation + '%' as `${number}%`,
+                    },
+                  ]}
+                />
+              </View>
+            </>
+          ) : null}
           <KodaButton
-            label="Ver mi plan"
+            label={hasExam ? 'Ver mi plan' : 'Organizar mi semana'}
             icon="arrow-forward"
             variant="secondary"
             onPress={() => router.push('/plan')}
@@ -153,7 +166,7 @@ export default function HomeScreen() {
           }) : (
             <KodaCard style={styles.emptySessionCard}>
               <Text style={[styles.emptySessionTitle, { color: theme.text }]}>Aún no hay bloques para hoy</Text>
-              <Text style={[styles.emptySessionText, { color: theme.textSecondary }]}>Añade disponibilidad desde tu plan y KODA propondrá un repaso.</Text>
+              <Text style={[styles.emptySessionText, { color: theme.textSecondary }]}>{plan.length ? 'Puedes reservar este día para descansar o ajustar tu plan.' : 'Añade disponibilidad y un examen desde tu plan para que KODA proponga un repaso.'}</Text>
             </KodaCard>
           )}
         </View>

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaProgressBar, KodaScreen, KodaSectionTitle } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
@@ -20,6 +20,7 @@ export default function SimulationsScreen() {
   const courses = useMemo(() => workspace.courses.filter((course) => course.isActive), [workspace.courses]);
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+  const [isLoadingData, setLoadingData] = useState(true);
   const [courseId, setCourseId] = useState('');
   const [questions, setQuestions] = useState<SimulationQuestion[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
@@ -31,13 +32,19 @@ export default function SimulationsScreen() {
   const selectedCourseId = courses.some((course) => course.id === courseId) ? courseId : courses[0]?.id ?? '';
 
   const loadData = useCallback(async () => {
-    if (status !== 'signed_in') return;
+    if (status !== 'signed_in') {
+      setLoadingData(false);
+      return;
+    }
     try {
+      setLoadingData(true);
       const [nextDocuments, nextAttempts] = await Promise.all([listStudyDocuments(), listQuizAttempts()]);
       setDocuments(nextDocuments);
       setAttempts(nextAttempts);
     } catch (error) {
       console.warn('No se pudieron cargar los simulacros', error);
+    } finally {
+      setLoadingData(false);
     }
   }, [status]);
 
@@ -246,7 +253,15 @@ export default function SimulationsScreen() {
 
       <View style={styles.sectionBlock}>
         <KodaSectionTitle title="Desde un material analizado" action="Materiales" onActionPress={() => router.push('/materials')} />
-        {availableDocuments.length ? availableDocuments.map((document) => (
+        {isLoadingData ? (
+          <KodaCard style={styles.emptyCard}>
+            <ActivityIndicator accessibilityLabel="Cargando materiales para practicar" color={theme.accent} />
+            <View style={styles.emptyCopy}>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>Cargando tu práctica</Text>
+              <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>Estamos revisando los materiales que ya analizaste.</Text>
+            </View>
+          </KodaCard>
+        ) : availableDocuments.length ? availableDocuments.map((document) => (
           <KodaCard key={document.id} style={styles.sourceCard}>
             <View style={[styles.sourceIcon, { backgroundColor: theme.successSoft }]}>
               <Ionicons color={theme.success} name="document-text-outline" size={20} />

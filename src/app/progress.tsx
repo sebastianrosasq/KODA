@@ -47,10 +47,12 @@ export default function ProgressScreen() {
             <Text style={[styles.scoreLabel, { color: theme.textSecondary }]}>nivel</Text>
           </View>
           <View style={styles.scoreCopy}>
-            <Text style={[styles.scoreTitle, { color: theme.text }]}>Vas por buen camino</Text>
+            <Text style={[styles.scoreTitle, { color: theme.text }]}>{averageProgress ? 'Tu avance hasta ahora' : 'Tu punto de partida'}</Text>
             <Text style={[styles.scoreText, { color: theme.textSecondary }]}>
               {focusCourse
-                ? `Prioriza ${focusCourse.name} para equilibrar tu semana.`
+                ? averageProgress
+                  ? `Prioriza ${focusCourse.name} para equilibrar tu semana.`
+                  : `Aún no registras avances en ${focusCourse.name}. Empieza con un bloque corto o unas tarjetas.`
                 : 'Añade tus cursos y temas para recibir una recomendación personalizada.'}
             </Text>
           </View>

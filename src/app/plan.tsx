@@ -58,13 +58,15 @@ export default function PlanScreen() {
             <View style={[styles.statusPill, { backgroundColor: completion >= 50 ? theme.successSoft : theme.warningSoft }]}>
               <Ionicons color={completion >= 50 ? theme.success : theme.warning} name={completion >= 50 ? 'checkmark-circle' : 'time-outline'} size={15} />
               <Text style={[styles.statusPillText, { color: completion >= 50 ? theme.success : theme.warning }]}>
-                {completion >= 50 ? 'En ritmo' : 'Por iniciar'}
+                {plan.length ? completion >= 50 ? 'En ritmo' : 'Por iniciar' : 'Sin plan'}
               </Text>
             </View>
           </View>
           <KodaProgressBar color={theme.accent} progress={completion} />
           <KodaText tone="secondary" style={styles.summaryDescription}>
-            {completedSessions} de {plan.length} bloques completados. Puedes mover o añadir horas cuando tu semana cambie.
+            {plan.length
+              ? `${completedSessions} de ${plan.length} bloques completados. Puedes mover o añadir horas cuando tu semana cambie.`
+              : 'Registra tus exámenes, temas y horas disponibles para que KODA arme bloques realistas.'}
           </KodaText>
         </KodaCard>
       </KodaReveal>
@@ -110,14 +112,14 @@ export default function PlanScreen() {
         ) : (
           <KodaCard style={styles.emptyCard}>
             <Ionicons color={theme.textTertiary} name="leaf-outline" size={22} />
-            <KodaText tone="secondary">No hay bloques para este día. Puedes reservarlo para descansar o añadir uno.</KodaText>
+            <KodaText tone="secondary">{plan.length ? 'No hay bloques para este día. Puedes reservarlo para descansar o añadir uno.' : 'Aún no organizaste tu semana. Añade un examen y tus horas disponibles para crear el primer bloque.'}</KodaText>
           </KodaCard>
         )}
       </KodaReveal>
 
       <KodaReveal delay={180} style={styles.sectionBlock}>
         <KodaSectionTitle title="Exámenes próximos" action="Agregar" onActionPress={() => setEditorVisible(true)} />
-        {upcomingExams.map((exam) => {
+        {upcomingExams.length ? upcomingExams.map((exam) => {
           const course = workspace.courses.find((item) => item.id === exam.courseId);
           const daysUntil = getDaysUntilExam(exam.dateIso);
           return (
@@ -130,12 +132,17 @@ export default function PlanScreen() {
               <Text style={[styles.examDays, { color: theme.text }]}>{daysUntil}d</Text>
             </KodaCard>
           );
-        })}
+        }) : (
+          <KodaCard style={styles.emptyCard}>
+            <Ionicons color={theme.textTertiary} name="calendar-outline" size={22} />
+            <KodaText tone="secondary">Aún no registras exámenes. Añade el primero para que KODA priorice tus sesiones.</KodaText>
+          </KodaCard>
+        )}
       </KodaReveal>
 
       <KodaReveal delay={225} style={styles.sectionBlock}>
         <KodaSectionTitle title="Temas que siguen" action="Añadir" onActionPress={() => setEditorVisible(true)} />
-        <KodaCard style={styles.topicCard}>
+        {pendingTopics.length ? <KodaCard style={styles.topicCard}>
           {pendingTopics.map((topic, index) => {
             const course = workspace.courses.find((item) => item.id === topic.courseId);
             return (
@@ -149,7 +156,12 @@ export default function PlanScreen() {
               </View>
             );
           })}
-        </KodaCard>
+        </KodaCard> : (
+          <KodaCard style={styles.emptyCard}>
+            <Ionicons color={theme.textTertiary} name="list-outline" size={22} />
+            <KodaText tone="secondary">Añade un tema pendiente para que KODA lo distribuya antes de tu examen.</KodaText>
+          </KodaCard>
+        )}
       </KodaReveal>
 
       {isEditorVisible ? <PlanEditorModal onClose={() => setEditorVisible(false)} /> : null}

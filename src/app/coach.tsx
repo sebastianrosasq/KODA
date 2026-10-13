@@ -5,11 +5,17 @@ import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, View }
 
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaScreen } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
-import { askStudyCoach } from '@/features/ai/study-coach';
+import {
+  askStudyCoach,
+  clearStudyCoachMessages,
+  getStudyCoachRemainingMessages,
+  listStudyCoachMessages,
+  type StudyCoachMessage,
+} from '@/features/ai/study-coach';
 import { getAiDocumentConsent, listStudyDocuments, recordAiDocumentConsent, type StudyDocument } from '@/features/ai/study-documents';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
-type CoachMessage = { id: string; role: 'assistant' | 'student'; text: string };
+type CoachMessage = Pick<StudyCoachMessage, 'id' | 'role' | 'text'>;
 
 const welcomeMessage: CoachMessage = {
   id: 'welcome',
@@ -40,11 +46,12 @@ export default function CoachScreen() {
   const params = useLocalSearchParams<{ documentId?: string | string[] }>();
   const initialDocumentId = typeof params.documentId === 'string' ? params.documentId : '';
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
-  const [selectedDocumentId, setSelectedDocumentId] = useState(initialDocumentId);
+  const [selectedDocumentId, setSelectedDocumentId] = useState(() => initialDocumentId);
   const [hasConsent, setHasConsent] = useState(false);
   const [isConsenting, setConsenting] = useState(false);
   const [isLoading, setLoading] = useState(true);
   const [isSending, setSending] = useState(false);
+  const [isClearingHistory, setClearingHistory] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<CoachMessage[]>([welcomeMessage]);
   const [remainingMessages, setRemainingMessages] = useState<number | null>(null);
@@ -57,18 +64,25 @@ export default function CoachScreen() {
 
   const load = useCallback(async () => {
     try {
-      const [nextDocuments, consent] = await Promise.all([listStudyDocuments(), getAiDocumentConsent()]);
+      setLoading(true);
+      const [nextDocuments, consent, previousMessages, quota] = await Promise.all([
+        listStudyDocuments(),
+        getAiDocumentConsent(),
+        listStudyCoachMessages(),
+        getStudyCoachRemainingMessages(),
+      ]);
       setDocuments(nextDocuments);
       setHasConsent(consent);
-      if (!selectedDocumentId && nextDocuments.some((document) => document.analysisStatus === 'completed')) {
-        setSelectedDocumentId(nextDocuments.find((document) => document.analysisStatus === 'completed')!.id);
-      }
+      setMessages(previousMessages.length ? previousMessages : [welcomeMessage]);
+      setRemainingMessages(quota);
+      setSelectedDocumentId((current) => initialDocumentId || current || nextDocuments.find((document) => document.analysisStatus === 'completed')?.id || '');
     } catch (error) {
       console.warn('No se pudo cargar el contexto para KODA IA', error);
+      setRequestError('No se pudo recuperar por completo tu historial. Vuelve a intentarlo en unos momentos.');
     } finally {
       setLoading(false);
     }
-  }, [selectedDocumentId]);
+  }, [initialDocumentId]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -104,6 +118,9 @@ export default function CoachScreen() {
       const reply = await askStudyCoach({ message, documentId: selectedDocumentId || undefined });
       setMessages((current) => [...current, { id: `assistant-${Date.now()}`, role: 'assistant', text: reply.answer }]);
       setRemainingMessages(reply.remainingMessages);
+      if (!reply.historySaved) {
+        setRequestError('La respuesta llegó, pero no se pudo guardar en tu historial. Intenta recargar antes de salir.');
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'KODA no pudo responder en este momento.';
       setRequestError(errorMessage);
@@ -117,16 +134,45 @@ export default function CoachScreen() {
     }
   };
 
+  const confirmClearHistory = () => {
+    Alert.alert('Limpiar historial', 'Se eliminarán tus preguntas y respuestas guardadas de esta cuenta. Esta acción no se puede deshacer.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Limpiar',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              setClearingHistory(true);
+              await clearStudyCoachMessages();
+              setMessages([welcomeMessage]);
+              setRequestError(null);
+            } catch (error) {
+              Alert.alert('No se pudo limpiar el historial', error instanceof Error ? error.message : 'Intenta nuevamente.');
+            } finally {
+              setClearingHistory(false);
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
   return (
     <KodaScreen>
       <KodaPageHeader
         eyebrow="KODA IA"
         title="Tu compañero de repaso"
-        subtitle="Las respuestas usan tu material seleccionado cuando esté disponible. Verifica siempre lo importante."
-        right={<KodaIconButton icon="chevron-back" label="Volver" onPress={() => router.back()} />}
+        subtitle="Las respuestas usan tu material seleccionado cuando esté disponible. Tu historial queda en tu cuenta y puedes borrarlo cuando quieras."
+        right={
+          <View style={styles.headerActions}>
+            {messages.length > 1 ? <KodaIconButton icon="trash-outline" label={isClearingHistory ? 'Limpiando historial' : 'Limpiar historial'} onPress={isClearingHistory ? undefined : confirmClearHistory} style={isClearingHistory ? styles.disabledAction : undefined} /> : null}
+            <KodaIconButton icon="chevron-back" label="Volver" onPress={() => router.back()} />
+          </View>
+        }
       />
 
-      {!hasConsent ? (
+      {!isLoading && !hasConsent ? (
         <KodaCard style={[styles.consentCard, { backgroundColor: theme.surfaceMuted }]}>
           <View style={styles.consentCopy}>
             <Text style={[styles.consentTitle, { color: theme.text }]}>Antes de conversar</Text>
@@ -141,18 +187,19 @@ export default function CoachScreen() {
           <Text style={[styles.contextTitle, { color: theme.text }]}>Contexto de estudio</Text>
           <KodaButton icon="cloud-upload-outline" label="Subir material" onPress={() => router.push('/materials')} variant="quiet" />
         </View>
-        {isLoading ? <ActivityIndicator color={theme.accent} /> : null}
-        <View style={styles.pills}>
-          <KodaPill label="Sin material" onPress={() => setSelectedDocumentId('')} selected={!selectedDocumentId} />
-          {analyzedDocuments.map((document) => (
-            <KodaPill
-              key={document.id}
-              label={document.analysis?.title ?? document.originalFilename}
-              onPress={() => setSelectedDocumentId(document.id)}
-              selected={selectedDocumentId === document.id}
-            />
-          ))}
-        </View>
+        {isLoading ? <ActivityIndicator accessibilityLabel="Cargando tu material" color={theme.accent} /> : (
+          <View style={styles.pills}>
+            <KodaPill label="Sin material" onPress={() => setSelectedDocumentId('')} selected={!selectedDocumentId} />
+            {analyzedDocuments.map((document) => (
+              <KodaPill
+                key={document.id}
+                label={document.analysis?.title ?? document.originalFilename}
+                onPress={() => setSelectedDocumentId(document.id)}
+                selected={selectedDocumentId === document.id}
+              />
+            ))}
+          </View>
+        )}
         {!isLoading && !analyzedDocuments.length ? (
           <Text style={[styles.contextHint, { color: theme.textTertiary }]}>Sube un PDF o audio desde Materiales para hacer preguntas directamente sobre él.</Text>
         ) : null}
@@ -199,7 +246,7 @@ export default function CoachScreen() {
           value={prompt}
         />
         <View style={styles.composerFooter}>
-          <Text style={[styles.quota, { color: theme.textTertiary }]}>{hasConsent ? (remainingMessages === null ? 'Hasta 8 mensajes de IA al día' : `${remainingMessages} mensajes de IA restantes hoy`) : 'Acepta el aviso de IA para activar el chat.'}</Text>
+          <Text style={[styles.quota, { color: theme.textTertiary }]}>{hasConsent ? (isLoading ? 'Revisando tu límite diario…' : remainingMessages === null ? 'Límite diario: 8 mensajes de IA.' : `${remainingMessages} mensajes de IA restantes hoy`) : isLoading ? 'Cargando tu chat…' : 'Acepta el aviso de IA para activar el chat.'}</Text>
           <KodaButton disabled={isSending || !prompt.trim() || !hasConsent} icon="send-outline" label={isSending ? 'Enviando…' : 'Enviar'} onPress={() => void submit()} />
         </View>
       </KodaCard>
@@ -212,6 +259,8 @@ const styles = StyleSheet.create({
   consentCopy: { gap: 4 },
   consentTitle: { fontSize: 15, fontWeight: '900' },
   consentText: { fontSize: 13, fontWeight: '600', lineHeight: 20 },
+  headerActions: { flexDirection: 'row', gap: KodaSpacing.sm },
+  disabledAction: { opacity: 0.45 },
   contextBlock: { gap: KodaSpacing.sm },
   contextHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   contextTitle: { fontSize: 16, fontWeight: '900' },
