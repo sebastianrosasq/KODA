@@ -199,7 +199,7 @@ export function friendlyFunctionError(error: unknown, fallback = 'No se pudo com
   const userMessage = (value: unknown) => {
     if (typeof value !== 'string' || !value.trim()) return '';
     if (value.includes('La IA aún no está configurada')) {
-      return 'La asistencia con IA se está preparando. Tu material puede guardarse mientras tanto.';
+      return 'La asistencia con IA se está preparando. Intenta nuevamente cuando esté disponible.';
     }
     return value.trim();
   };
