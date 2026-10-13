@@ -11,7 +11,8 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Fundación y diseño | Listo | Expo Router, TypeScript, diseño claro/oscuro y componentes reutilizables. |
 | Cuenta y datos | En configuración | Correo, sesión segura, RLS y sincronización; Google requiere registrar el proveedor externo. |
 | Organización | Listo | Cursos, exámenes, temas, disponibilidad y un plan explicable. |
-| Catálogo curricular | En crecimiento | 15 instituciones, 16 carreras, 7 planes verificados y 380 cursos. |
+| Catálogo curricular | En crecimiento | 15 instituciones indexadas; 7 planes verificados, 380 cursos y registro inicial solo con mallas completas. |
+| Calendario académico | En crecimiento | 9 periodos 2026 con 34 eventos oficiales de matrícula, clases y evaluaciones. |
 | Repaso | Listo | Flashcards propias por curso y dominio acumulado. |
 | Seguimiento | Listo | Avance por curso, riesgos próximos y recordatorios locales semanales. |
 | IA, PDF y simulacros | Pendiente | Se implementarán mediante Storage privado y Edge Functions, nunca desde claves dentro de la APK. |
@@ -91,16 +92,17 @@ KODA/
 
 | Estado | Comportamiento en KODA |
 | --- | --- |
-| `verified` | Se consulta la malla oficial y se sugieren los cursos del ciclo elegido. |
-| `source_identified` | Se permite registrar institución, carrera y ciclo, pero no se inventan cursos. El estudiante puede agregarlos manualmente. |
+| `verified` | Se muestra durante el registro, se consulta la malla oficial y se sugieren los cursos del ciclo elegido. |
+| `source_identified` | Permanece indexada para el equipo; no se muestra como opción de registro hasta que tenga todos sus cursos contrastados. |
 
-El detalle de instituciones, planes, fuentes y próximos contrastes está en [CURRICULUM_CATALOG_README.md](supabase/seed/CURRICULUM_CATALOG_README.md).
+El detalle de instituciones, planes, fuentes y próximos contrastes está en [CURRICULUM_CATALOG_README.md](supabase/seed/CURRICULUM_CATALOG_README.md). Los periodos y eventos oficiales consultados están en [ACADEMIC_CALENDAR.md](docs/ACADEMIC_CALENDAR.md).
 
 ## Documentación útil
 
 - [Guía de instalación y primer arranque](docs/GETTING_STARTED.md)
 - [Cómo colaborar: ramas, revisiones y commits](CONTRIBUTING.md)
 - [Acceso con correo y Google](docs/AUTH_SETUP.md)
+- [Calendarios académicos verificados y política de actualización](docs/ACADEMIC_CALENDAR.md)
 - [Alcance y 16 casos de uso](docs/PRODUCT_SCOPE.md)
 - [Arquitectura, límites de seguridad y recorrido de IA](docs/SYSTEM_ARCHITECTURE.md)
 - [Plan S1–S8](docs/SPRINTS.md)

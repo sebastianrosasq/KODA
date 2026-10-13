@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
-import { catalogInstitutions, getCatalogProgram, getProgramsForInstitution, getSuggestedCourses } from '@/data/academic-catalog';
+import { getCatalogProgram, getProgramsForInstitution, getSuggestedCourses } from '@/data/academic-catalog';
 import { KodaReveal } from '@/components/koda-reveal';
 import { AccountModal } from '@/features/auth/account-modal';
 import {
@@ -60,7 +60,7 @@ export default function ProfileScreen() {
         <KodaPageHeader
           eyebrow="Tu espacio"
           title="Perfil"
-          subtitle="Tu carrera es editable: KODA solo propone un punto de partida."
+          subtitle="Tu institución queda protegida; ajusta tu carrera, ciclo y cursos cuando lo necesites."
         />
       </KodaReveal>
 
@@ -74,12 +74,12 @@ export default function ProfileScreen() {
               {workspace.profile.programName} · {workspace.profile.currentTerm}.° {termLabel.toLocaleLowerCase()}
             </Text>
           </View>
-          <KodaIconButton icon="create-outline" label="Editar perfil académico" onPress={() => setAcademicModalVisible(true)} />
+          <KodaIconButton icon="create-outline" label="Editar carrera y ciclo" onPress={() => setAcademicModalVisible(true)} />
         </KodaCard>
       </KodaReveal>
 
       <KodaReveal delay={90} style={styles.sectionBlock}>
-        <KodaSectionTitle title="Tus cursos" action="Editar perfil" onActionPress={() => setAcademicModalVisible(true)} />
+        <KodaSectionTitle title="Tus cursos" action="Editar carrera y ciclo" onActionPress={() => setAcademicModalVisible(true)} />
         {workspace.courses.map((course) => (
           <KodaCard key={course.id} style={styles.courseCard}>
             <View style={[styles.courseDot, { backgroundColor: getToneColor(course.tone, theme) }]} />
@@ -196,36 +196,29 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
   const { workspace, preloadCourses, updateProfile } = useKodaData();
-  const [institutionSlug, setInstitutionSlug] = useState(workspace.profile.institutionSlug);
+  const institutionSlug = workspace.profile.institutionSlug;
   const programs = useMemo(() => getProgramsForInstitution(institutionSlug), [institutionSlug]);
   const [programSlug, setProgramSlug] = useState(workspace.profile.programSlug);
   const selectedProgram = programs.find((program) => program.slug === programSlug) ?? programs[0];
   const [term, setTerm] = useState(workspace.profile.currentTerm);
   const [isSaving, setSaving] = useState(false);
 
-  const selectInstitution = (slug: string) => {
-    const nextPrograms = getProgramsForInstitution(slug);
-    setInstitutionSlug(slug);
-    setProgramSlug(nextPrograms[0]?.slug ?? '');
-    setTerm(1);
-  };
-
   const saveProfile = async () => {
-    const institution = catalogInstitutions.find((item) => item.slug === institutionSlug);
-    if (!institution || !selectedProgram) return;
+    if (!selectedProgram) return;
     setSaving(true);
-    updateProfile({
-      displayName: workspace.profile.displayName,
-      institutionSlug,
-      institutionName: institution.name,
-      programSlug: selectedProgram.slug,
-      programName: selectedProgram.name,
-      currentTerm: term,
-    });
-    const suggestedCourses = await getSuggestedCourses(institutionSlug, selectedProgram.slug, term);
-    preloadCourses(suggestedCourses);
-    setSaving(false);
-    onClose();
+    try {
+      updateProfile({
+        ...workspace.profile,
+        programSlug: selectedProgram.slug,
+        programName: selectedProgram.name,
+        currentTerm: term,
+      });
+      const suggestedCourses = await getSuggestedCourses(institutionSlug, selectedProgram.slug, term);
+      preloadCourses(suggestedCourses);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -236,15 +229,16 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderCopy}>
                 <Text style={[styles.modalTitle, { color: theme.text }]}>Perfil académico</Text>
-                <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>Elige una base y conserva el control de tus cursos.</Text>
+                <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>Tu institución fue elegida durante el registro y no se modifica aquí.</Text>
               </View>
               <KodaIconButton icon="close" label="Cerrar" onPress={onClose} />
             </View>
-            <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>INSTITUCIÓN</Text>
-            <View style={styles.pills}>
-              {catalogInstitutions.map((institution) => (
-                <KodaPill key={institution.slug} label={institution.name} onPress={() => selectInstitution(institution.slug)} selected={institution.slug === institutionSlug} />
-              ))}
+            <View style={[styles.institutionLock, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }]}>
+              <Ionicons color={theme.accent} name="lock-closed-outline" size={17} />
+              <View style={styles.institutionLockCopy}>
+                <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>INSTITUCIÓN REGISTRADA</Text>
+                <Text style={[styles.institutionLockName, { color: theme.text }]}>{workspace.profile.institutionName}</Text>
+              </View>
             </View>
             <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>CARRERA</Text>
             <View style={styles.pills}>
@@ -313,6 +307,9 @@ const styles = StyleSheet.create({
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: KodaSpacing.sm },
   catalogNotice: { alignItems: 'flex-start', borderRadius: KodaRadius.md, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.md },
   catalogNoticeText: { flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  institutionLock: { alignItems: 'center', borderRadius: KodaRadius.md, borderWidth: 1, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.md },
+  institutionLockCopy: { flex: 1, gap: 3 },
+  institutionLockName: { fontSize: 14, fontWeight: '800' },
   authInput: { borderRadius: KodaRadius.md, borderWidth: 1, fontSize: 16, minHeight: 50, paddingHorizontal: KodaSpacing.md },
   accountMessage: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
 });

@@ -72,6 +72,19 @@ export function getProgramsForInstitution(institutionSlug: string) {
   return catalogPrograms.filter((program) => program.institutionSlug === institutionSlug);
 }
 
+export function getRegistrationInstitutions() {
+  const readyInstitutionSlugs = new Set(
+    catalogPrograms
+      .filter((program) => program.status === 'verified')
+      .map((program) => program.institutionSlug),
+  );
+  return catalogInstitutions.filter((institution) => readyInstitutionSlugs.has(institution.slug));
+}
+
+export function getRegistrationPrograms(institutionSlug: string) {
+  return getProgramsForInstitution(institutionSlug).filter((program) => program.status === 'verified');
+}
+
 export function getCatalogProgram(institutionSlug: string, programSlug: string) {
   return catalogPrograms.find(
     (program) => program.institutionSlug === institutionSlug && program.slug === programSlug,

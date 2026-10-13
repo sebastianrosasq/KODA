@@ -24,6 +24,7 @@ function dateInDays(days: number) {
 }
 
 const defaultWorkspace: KodaWorkspace = {
+  academicProfileCompleted: true,
   profile: {
     displayName: 'Sebastián',
     institutionSlug: 'tecsup',
@@ -85,10 +86,31 @@ const defaultWorkspace: KodaWorkspace = {
   completedSessionIds: ['today-1830'],
 };
 
+function createEmptyAcademicWorkspace(displayName = 'Estudiante'): KodaWorkspace {
+  return {
+    academicProfileCompleted: false,
+    profile: {
+      displayName,
+      institutionSlug: '',
+      institutionName: '',
+      programSlug: '',
+      programName: '',
+      currentTerm: 1,
+    },
+    courses: [],
+    exams: [],
+    topics: [],
+    flashcards: [],
+    availability: [],
+    completedSessionIds: [],
+  };
+}
+
 function normalizeWorkspace(candidate: Partial<KodaWorkspace>): KodaWorkspace {
   const normalized = {
     ...defaultWorkspace,
     ...candidate,
+    academicProfileCompleted: candidate.academicProfileCompleted ?? Boolean(candidate.profile?.institutionSlug && candidate.profile?.programSlug),
     profile: candidate.profile ?? defaultWorkspace.profile,
     courses: candidate.courses ?? defaultWorkspace.courses,
     exams: candidate.exams ?? defaultWorkspace.exams,
@@ -122,6 +144,7 @@ type KodaDataContextValue = {
   workspace: KodaWorkspace;
   plan: ReturnType<typeof generateStudyPlan>;
   updateProfile: (profile: StudentAcademicProfile) => void;
+  completeAcademicProfile: (profile: StudentAcademicProfile, courseNames: string[]) => void;
   addCourse: (name: string) => void;
   preloadCourses: (names: string[]) => void;
   removeCourse: (courseId: string) => void;
@@ -153,6 +176,9 @@ function createId(prefix: string) {
 
 export function KodaDataProvider({ children }: { children: ReactNode }) {
   const { session } = useKodaAuth();
+  const sessionDisplayName = typeof session?.user.user_metadata.full_name === 'string'
+    ? session.user.user_metadata.full_name
+    : session?.user.email?.split('@')[0] ?? 'Estudiante';
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [hydrated, setHydrated] = useState(false);
   const [syncState, setSyncState] = useState<KodaDataContextValue['syncState']>('local');
@@ -227,8 +253,10 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     void loadWorkspaceFromSupabase(userId, workspaceRef.current)
       .then(async (remoteWorkspace) => {
         if (!active) return;
-        const currentWorkspace = remoteWorkspace ? normalizeWorkspace(remoteWorkspace) : workspaceRef.current;
-        if (remoteWorkspace) setCurrentWorkspace(currentWorkspace);
+        const currentWorkspace = remoteWorkspace
+          ? normalizeWorkspace(remoteWorkspace)
+          : createEmptyAcademicWorkspace(sessionDisplayName);
+        setCurrentWorkspace(currentWorkspace);
         syncedUserIdRef.current = userId;
         await syncWorkspaceToSupabase(userId, currentWorkspace);
         if (active) setSyncState('synced');
@@ -243,7 +271,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       active = false;
       if (syncedUserIdRef.current === userId) syncedUserIdRef.current = null;
     };
-  }, [hydrated, session?.user.id, setCurrentWorkspace]);
+  }, [hydrated, session?.user.id, sessionDisplayName, setCurrentWorkspace]);
 
   const updateWorkspace = useCallback((updater: (current: KodaWorkspace) => KodaWorkspace) => {
     const next = updater(workspaceRef.current);
@@ -253,6 +281,22 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = useCallback((profile: StudentAcademicProfile) => {
     updateWorkspace((current) => ({ ...current, profile }));
+  }, [updateWorkspace]);
+
+  const completeAcademicProfile = useCallback((profile: StudentAcademicProfile, courseNames: string[]) => {
+    updateWorkspace((current) => ({
+      ...current,
+      academicProfileCompleted: true,
+      profile,
+      courses: courseNames.map((name, index) => ({
+        id: createId('course'),
+        name,
+        termNumber: profile.currentTerm,
+        isActive: true,
+        wasPreloaded: true,
+        tone: tones[index % tones.length],
+      })),
+    }));
   }, [updateWorkspace]);
 
   const addCourse = useCallback((name: string) => {
@@ -410,6 +454,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       workspace,
       plan,
       updateProfile,
+      completeAcademicProfile,
       addCourse,
       preloadCourses,
       removeCourse,
@@ -438,6 +483,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       setCourseActive,
       toggleTopic,
       updateAvailability,
+      completeAcademicProfile,
       updateProfile,
       workspace,
       syncError,

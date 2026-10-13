@@ -14,6 +14,11 @@ type RemoteCurriculumProfile = {
   current_term_number: number | null;
 };
 
+type RemoteStudentProfile = {
+  display_name: string;
+  academic_profile_completed: boolean;
+};
+
 type RemoteCourse = {
   id: string;
   client_key: string;
@@ -175,6 +180,7 @@ export async function syncWorkspaceToSupabase(userId: string, workspace: KodaWor
     id: userId,
     display_name: workspace.profile.displayName.trim() || 'Estudiante',
     timezone: 'America/Lima',
+    academic_profile_completed: workspace.academicProfileCompleted,
   });
   throwIfError(accountError);
 
@@ -377,7 +383,7 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
 
   const profile = curriculumProfile as RemoteCurriculumProfile;
   const [{ data: account, error: accountError }, { data: institution, error: institutionError }, { data: program, error: programError }] = await Promise.all([
-    client.from('student_profiles').select('display_name').eq('id', userId).maybeSingle(),
+    client.from('student_profiles').select('display_name, academic_profile_completed').eq('id', userId).maybeSingle(),
     profile.institution_id
       ? client.from('curriculum_institutions').select('slug, name').eq('id', profile.institution_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -423,6 +429,7 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
   throwIfError(sessionError);
 
   return {
+    academicProfileCompleted: (account as RemoteStudentProfile | null)?.academic_profile_completed ?? Boolean(institution && program),
     profile: remoteProfile,
     courses: courses.map((course, index) => ({
       id: course.client_key,

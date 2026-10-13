@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { DarkTheme, DefaultTheme, Tabs, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { KodaAuthProvider } from '@/providers/koda-auth-provider';
-import { KodaDataProvider } from '@/providers/koda-data-provider';
+import { KodaAuthProvider, useKodaAuth } from '@/providers/koda-auth-provider';
+import { KodaDataProvider, useKodaData } from '@/providers/koda-data-provider';
 import { KodaThemeProvider, useKodaTheme } from '@/providers/koda-theme-provider';
 import { useStudyReminderNavigation } from '@/features/reminders/study-reminders';
+import { AcademicOnboardingModal } from '@/features/onboarding/academic-onboarding-modal';
 
 export default function RootLayout() {
   return (
@@ -20,6 +21,8 @@ export default function RootLayout() {
 }
 function KodaNavigation() {
   const { colorScheme, theme } = useKodaTheme();
+  const { status } = useKodaAuth();
+  const { hydrated, workspace } = useKodaData();
   useStudyReminderNavigation();
   const baseTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
@@ -100,6 +103,7 @@ function KodaNavigation() {
           }}
         />
       </Tabs>
+      {hydrated && status === 'signed_in' && !workspace.academicProfileCompleted ? <AcademicOnboardingModal /> : null}
     </ThemeProvider>
   );
 }

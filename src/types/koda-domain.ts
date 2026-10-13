@@ -67,6 +67,7 @@ export type PlannedSession = {
 };
 
 export type KodaWorkspace = {
+  academicProfileCompleted: boolean;
   profile: StudentAcademicProfile;
   courses: StudentCourse[];
   exams: StudentExam[];
