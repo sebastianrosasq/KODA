@@ -12,3 +12,9 @@
 | S8 · Release | Privacidad, manejo de errores, telemetría, APK interna y AAB de Play. | EAS / Play Console |
 
 Cada sprint termina con una demo en Android y criterios de aceptación verificables. Ningún sprint posterior se inicia con vulnerabilidades críticas no evaluadas o con secretos dentro del repositorio.
+
+## Estado de implementación
+
+- S1 está integrado: navegación, tema, componentes base e identidad visual.
+- S2 y S3 tienen una implementación local funcional y migraciones listas. La autenticación y sincronización remotas se activarán cuando el proyecto Supabase de KODA sea vinculado por su responsable.
+- La comprobación visual integral en Android se consolidará antes de cerrar el S8, sin reemplazar las validaciones de código de cada sprint.

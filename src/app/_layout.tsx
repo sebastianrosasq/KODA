@@ -2,12 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { DarkTheme, DefaultTheme, Tabs, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { KodaAuthProvider } from '@/providers/koda-auth-provider';
+import { KodaDataProvider } from '@/providers/koda-data-provider';
 import { KodaThemeProvider, useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function RootLayout() {
   return (
     <KodaThemeProvider>
-      <KodaNavigation />
+      <KodaAuthProvider>
+        <KodaDataProvider>
+          <KodaNavigation />
+        </KodaDataProvider>
+      </KodaAuthProvider>
     </KodaThemeProvider>
   );
 }

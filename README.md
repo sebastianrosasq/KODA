@@ -2,7 +2,7 @@
 
 KODA es una aplicación móvil para estudiantes peruanos durante la semana de exámenes. Organiza cursos, exámenes y temas; convierte el tiempo disponible en un plan de estudio, facilita el repaso y muestra el progreso real.
 
-> Estado actual: Sprint 1 en progreso. KODA ya tiene su navegación móvil, identidad visual premium y una demo funcional para Android; los datos actuales son de demostración local.
+> Estado actual: la base funcional de los Sprints 2 y 3 está lista para integrar Supabase. KODA ya organiza datos locales del estudiante, construye un plan de estudio explicable y conserva sus cambios en el dispositivo.
 
 ## Qué resolverá KODA
 
@@ -41,7 +41,7 @@ npm run start
 
 6. Pruébala en un Android con Expo Go o en un emulador. Los pasos detallados están en [GETTING_STARTED.md](docs/GETTING_STARTED.md).
 
-Para el Sprint 1 no se requieren cuentas de Supabase, Firebase u OpenAI y nadie debe crear ni compartir claves. **.env.example** es solo una referencia para etapas futuras.
+Para trabajar con la planificación local no se requieren cuentas de Supabase, Firebase u OpenAI. Cuando el responsable active Supabase, cada integrante configurará sus variables públicas solo en su archivo `.env` local; la explicación está en [SPRINT_2_3.md](docs/SPRINT_2_3.md).
 
 ## Comandos que usaremos
 
@@ -79,6 +79,7 @@ KODA/
 - [Arquitectura explicada con diagrama](docs/SYSTEM_ARCHITECTURE.md)
 - [Plan de los ocho sprints](docs/SPRINTS.md)
 - [Qué incluye y cómo probar el Sprint 1](docs/SPRINT_1.md)
+- [Qué incluyen los Sprints 2 y 3 y cómo activar Supabase](docs/SPRINT_2_3.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
 - [Catálogo curricular versionado](supabase/seed/CURRICULUM_CATALOG_README.md)
 

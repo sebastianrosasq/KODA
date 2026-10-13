@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { courseProgress, nextExam } from '@/data/demo-data';
+import { KodaReveal } from '@/components/koda-reveal';
 import {
   KodaCard,
   KodaPageHeader,
@@ -11,36 +11,51 @@ import {
   KodaText,
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
+import { useKodaData } from '@/providers/koda-data-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function ProgressScreen() {
   const { theme } = useKodaTheme();
+  const { dashboard } = useKodaData();
+  const { courseProgress } = dashboard;
+  const averageProgress = courseProgress.length
+    ? Math.round(courseProgress.reduce((sum, course) => sum + course.completed, 0) / courseProgress.length)
+    : 0;
+  const nextExam = dashboard.nextExam;
+  const focusCourse = courseProgress.slice().sort((left, right) => left.completed - right.completed)[0];
   const toneColor = {
-    purple: theme.accent,
+    plum: theme.accent,
     mint: theme.success,
     amber: theme.warning,
+    sky: '#3284A6',
   };
 
   return (
     <KodaScreen>
-      <KodaPageHeader
-        eyebrow="Seguimiento"
-        title="Tu avance real"
-        subtitle="Mide lo que ya dominaste y encuentra qué necesita atención."
-      />
+      <KodaReveal>
+        <KodaPageHeader
+          eyebrow="Seguimiento"
+          title="Tu avance real"
+          subtitle="Mide lo que ya dominaste y encuentra qué necesita atención."
+        />
+      </KodaReveal>
 
-      <KodaCard style={[styles.scoreCard, { backgroundColor: theme.surfaceMuted }]}>
-        <View style={[styles.scoreCircle, { borderColor: theme.accent }]}>
-          <Text style={[styles.scoreNumber, { color: theme.text }]}>62</Text>
-          <Text style={[styles.scoreLabel, { color: theme.textSecondary }]}>nivel</Text>
-        </View>
-        <View style={styles.scoreCopy}>
-          <Text style={[styles.scoreTitle, { color: theme.text }]}>Vas por buen camino</Text>
-          <Text style={[styles.scoreText, { color: theme.textSecondary }]}>
-            Tienes base para tu próximo examen. Enfócate en Base de Datos para equilibrar la semana.
-          </Text>
-        </View>
-      </KodaCard>
+      <KodaReveal delay={45}>
+        <KodaCard style={[styles.scoreCard, { backgroundColor: theme.surfaceMuted }]}>
+          <View style={[styles.scoreCircle, { borderColor: theme.accent }]}>
+            <Text style={[styles.scoreNumber, { color: theme.text }]}>{averageProgress}</Text>
+            <Text style={[styles.scoreLabel, { color: theme.textSecondary }]}>nivel</Text>
+          </View>
+          <View style={styles.scoreCopy}>
+            <Text style={[styles.scoreTitle, { color: theme.text }]}>Vas por buen camino</Text>
+            <Text style={[styles.scoreText, { color: theme.textSecondary }]}>
+              {focusCourse
+                ? `Prioriza ${focusCourse.name} para equilibrar tu semana.`
+                : 'Añade tus cursos y temas para recibir una recomendación personalizada.'}
+            </Text>
+          </View>
+        </KodaCard>
+      </KodaReveal>
 
       <View style={styles.sectionBlock}>
         <KodaSectionTitle title="Avance por materia" />
@@ -70,9 +85,11 @@ export default function ProgressScreen() {
             <Ionicons color={theme.warning} name="time-outline" size={19} />
           </View>
           <View style={styles.alertCopy}>
-            <Text style={[styles.alertTitle, { color: theme.text }]}>{nextExam.course}</Text>
+            <Text style={[styles.alertTitle, { color: theme.text }]}>{nextExam?.course ?? 'Añade tu primer examen'}</Text>
             <Text style={[styles.alertText, { color: theme.textSecondary }]}>
-              {nextExam.remaining + ' para el examen. Aún faltan patrones de integración y práctica corta.'}
+              {nextExam
+                ? `${nextExam.remaining} para el examen. Revisa el siguiente tema: ${nextExam.topic}.`
+                : 'Cuando registres un examen, KODA destacará aquí el curso que necesita atención.'}
             </Text>
           </View>
         </KodaCard>

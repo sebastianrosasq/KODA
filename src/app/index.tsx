@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { courseProgress, nextExam, student, todaySessions } from '@/data/demo-data';
+import { KodaReveal } from '@/components/koda-reveal';
 import {
   KodaAvatar,
   KodaButton,
@@ -16,51 +15,56 @@ import {
   KodaText,
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
+import { getCatalogProgram } from '@/data/academic-catalog';
+import { useKodaData } from '@/providers/koda-data-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function HomeScreen() {
   const { theme } = useKodaTheme();
-  const [completedSessions, setCompletedSessions] = useState(
-    todaySessions.filter((session) => session.completed).map((session) => session.id),
-  );
-
-  const isCompleted = (id: string) => completedSessions.includes(id);
-  const completeSession = (id: string) => {
-    setCompletedSessions((currentSessions) =>
-      currentSessions.includes(id) ? currentSessions : [...currentSessions, id],
-    );
+  const { completeSession, dashboard, plan, workspace } = useKodaData();
+  const todaySessions = plan.filter((session) => session.day === 'Hoy');
+  const nextExam = dashboard.nextExam ?? {
+    course: 'Añade tu primer examen',
+    topic: 'KODA organizará los temas y bloques que necesites.',
+    dateLabel: 'Sin fecha',
+    remaining: '—',
+    preparation: 0,
   };
+  const { courseProgress } = dashboard;
+  const termLabel = getCatalogProgram(workspace.profile.institutionSlug, workspace.profile.programSlug)?.termLabel ?? 'Ciclo';
 
   const toneColor = {
-    purple: theme.accent,
+    plum: theme.accent,
     mint: theme.success,
     amber: theme.warning,
+    sky: '#3284A6',
   };
 
   return (
     <KodaScreen>
-      <View style={styles.topBar}>
-        <View style={styles.brandLockup}>
-          <View style={[styles.brandMark, { backgroundColor: theme.accent }]}>
-            <Text style={[styles.brandLetter, { color: theme.onAccent }]}>K</Text>
+      <KodaReveal>
+        <View style={styles.topBar}>
+          <View style={styles.brandLockup}>
+            <View style={[styles.brandMark, { backgroundColor: theme.accent }]}>
+              <Text style={[styles.brandLetter, { color: theme.onAccent }]}>K</Text>
+            </View>
+            <Text style={[styles.brandName, { color: theme.text }]}>KODA</Text>
           </View>
-          <Text style={[styles.brandName, { color: theme.text }]}>KODA</Text>
+          <KodaIconButton icon="person-outline" label="Abrir perfil" onPress={() => router.push('/profile')} />
         </View>
-        <KodaIconButton
-          icon="person-outline"
-          label="Abrir perfil"
-          onPress={() => router.push('/profile')}
+      </KodaReveal>
+
+      <KodaReveal delay={45}>
+        <KodaPageHeader
+          eyebrow="Semana de exámenes"
+          title={'Hola, ' + workspace.profile.displayName}
+          subtitle="Hoy tienes tiempo suficiente para avanzar sin saturarte."
         />
-      </View>
+      </KodaReveal>
 
-      <KodaPageHeader
-        eyebrow="Semana de exámenes"
-        title={'Hola, ' + student.name}
-        subtitle="Hoy tienes tiempo suficiente para avanzar sin saturarte."
-      />
-
-      <KodaCard style={[styles.examCard, { backgroundColor: theme.accent, borderColor: theme.accent }]}>
-        <View style={styles.examTopRow}>
+      <KodaReveal delay={90}>
+        <KodaCard style={[styles.examCard, { backgroundColor: theme.accent, borderColor: theme.accent }]}>
+          <View style={styles.examTopRow}>
           <View style={styles.examCopy}>
             <Text style={[styles.examEyebrow, { color: theme.onAccent }]}>PRÓXIMO EXAMEN</Text>
             <Text style={[styles.examCourse, { color: theme.onAccent }]}>{nextExam.course}</Text>
@@ -68,11 +72,11 @@ export default function HomeScreen() {
           </View>
           <View style={[styles.daysBadge, { backgroundColor: theme.onAccent }]}>
             <Text style={[styles.daysNumber, { color: theme.accent }]}>{nextExam.remaining.split(' ')[0]}</Text>
-            <Text style={[styles.daysLabel, { color: theme.accent }]}>días</Text>
+            <Text style={[styles.daysLabel, { color: theme.accent }]}>{nextExam.remaining === '—' ? 'fecha' : 'días'}</Text>
           </View>
-        </View>
+          </View>
 
-        <View style={styles.examFooter}>
+          <View style={styles.examFooter}>
           <View style={styles.preparationRow}>
             <Text style={[styles.preparationLabel, { color: theme.onAccent }]}>Preparación</Text>
             <Text style={[styles.preparationValue, { color: theme.onAccent }]}>{nextExam.preparation}%</Text>
@@ -95,27 +99,28 @@ export default function HomeScreen() {
             onPress={() => router.push('/plan')}
             style={styles.heroButton}
           />
-        </View>
-      </KodaCard>
+          </View>
+        </KodaCard>
+      </KodaReveal>
 
       <View style={styles.sectionBlock}>
         <KodaSectionTitle title="Tu día de hoy" action="Ver plan" onActionPress={() => router.push('/plan')} />
         <View style={styles.sessionList}>
-          {todaySessions.map((session) => {
-            const completed = isCompleted(session.id);
+          {todaySessions.length ? todaySessions.map((session) => {
+            const completed = session.completed;
             return (
               <KodaCard key={session.id} style={styles.sessionCard}>
                 <View style={[styles.courseStripe, { backgroundColor: toneColor[session.tone] }]} />
                 <View style={styles.sessionTime}>
-                  <Text style={[styles.timeLabel, { color: theme.text }]}>{session.time}</Text>
-                  <Text style={[styles.durationLabel, { color: theme.textTertiary }]}>{session.duration}</Text>
+                  <Text style={[styles.timeLabel, { color: theme.text }]}>{session.startsAt}</Text>
+                  <Text style={[styles.durationLabel, { color: theme.textTertiary }]}>{session.durationMinutes} min</Text>
                 </View>
                 <View style={styles.sessionCopy}>
                   <Text numberOfLines={1} style={[styles.sessionTitle, { color: theme.text }]}>
                     {session.title}
                   </Text>
                   <Text numberOfLines={1} style={[styles.sessionCourse, { color: theme.textSecondary }]}>
-                    {session.course}
+                    {session.courseName}
                   </Text>
                 </View>
                 {completed ? (
@@ -126,15 +131,20 @@ export default function HomeScreen() {
                   </View>
                 ) : (
                   <KodaIconButton
-                    icon="play"
-                    label={'Empezar ' + session.title}
+                    icon="checkmark-circle-outline"
+                    label={'Completar ' + session.title}
                     onPress={() => completeSession(session.id)}
                     style={styles.playButton}
                   />
                 )}
               </KodaCard>
             );
-          })}
+          }) : (
+            <KodaCard style={styles.emptySessionCard}>
+              <Text style={[styles.emptySessionTitle, { color: theme.text }]}>Aún no hay bloques para hoy</Text>
+              <Text style={[styles.emptySessionText, { color: theme.textSecondary }]}>Añade disponibilidad desde tu plan y KODA propondrá un repaso.</Text>
+            </KodaCard>
+          )}
         </View>
       </View>
 
@@ -157,11 +167,11 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.miniProfile}>
-        <KodaAvatar initials="SR" />
+        <KodaAvatar initials={workspace.profile.displayName.slice(0, 2).toUpperCase()} />
         <View style={styles.miniProfileCopy}>
-          <KodaText style={styles.miniProfileTitle}>{student.institution}</KodaText>
+          <KodaText style={styles.miniProfileTitle}>{workspace.profile.institutionName}</KodaText>
           <KodaText tone="secondary" style={styles.miniProfileSubtitle}>
-            {student.career + ' · ' + student.cycle}
+            {workspace.profile.programName + ' · ' + workspace.profile.currentTerm + '.° ' + termLabel.toLocaleLowerCase()}
           </KodaText>
         </View>
       </View>
@@ -278,6 +288,19 @@ const styles = StyleSheet.create({
   },
   sessionList: {
     gap: KodaSpacing.sm,
+  },
+  emptySessionCard: {
+    gap: KodaSpacing.xs,
+    padding: KodaSpacing.lg,
+  },
+  emptySessionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  emptySessionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 19,
   },
   sessionCard: {
     alignItems: 'center',
