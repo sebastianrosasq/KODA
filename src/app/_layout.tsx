@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { KodaAuthProvider } from '@/providers/koda-auth-provider';
 import { KodaDataProvider } from '@/providers/koda-data-provider';
 import { KodaThemeProvider, useKodaTheme } from '@/providers/koda-theme-provider';
+import { useStudyReminderNavigation } from '@/features/reminders/study-reminders';
 
 export default function RootLayout() {
   return (
@@ -19,6 +20,7 @@ export default function RootLayout() {
 }
 function KodaNavigation() {
   const { colorScheme, theme } = useKodaTheme();
+  useStudyReminderNavigation();
   const baseTheme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
     ...baseTheme,

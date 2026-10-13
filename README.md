@@ -1,93 +1,116 @@
 # KODA
 
-KODA es una aplicación móvil para estudiantes peruanos durante la semana de exámenes. Organiza cursos, exámenes y temas; convierte el tiempo disponible en un plan de estudio, facilita el repaso y muestra el progreso real.
+> Una app móvil para que estudiantes peruanos lleguen a la semana de exámenes con cursos, temas y tiempo de estudio en orden.
 
-> Estado actual: la base funcional de los Sprints 2 y 3 está lista para integrar Supabase. KODA ya organiza datos locales del estudiante, construye un plan de estudio explicable y conserva sus cambios en el dispositivo.
+KODA transforma fechas de evaluación, temas pendientes y horas disponibles en un plan de estudio claro. La malla curricular acelera el registro, pero cada curso permanece bajo control del estudiante: puede añadirlo, quitarlo o desactivarlo cuando lo necesite.
 
-## Qué resolverá KODA
+## Estado del proyecto
 
-- Registrar institución, carrera y ciclo del estudiante.
-- Sugerir una malla curricular editable.
-- Organizar exámenes, temas y disponibilidad.
-- Proponer un plan de estudio explicable.
-- Ofrecer flashcards, material, audios, progreso y, más adelante, IA y análisis de PDF.
+| Área | Estado | Qué incluye hoy |
+| --- | --- | --- |
+| Fundación y diseño | Listo | Expo Router, TypeScript, diseño claro/oscuro y componentes reutilizables. |
+| Cuenta y datos | Listo | Supabase Auth, PostgreSQL, RLS y sincronización por estudiante. |
+| Organización | Listo | Cursos, exámenes, temas, disponibilidad y un plan explicable. |
+| Catálogo curricular | En crecimiento | 15 instituciones, 16 carreras, 7 planes verificados y 380 cursos. |
+| Repaso | Listo | Flashcards propias por curso y dominio acumulado. |
+| Seguimiento | Listo | Avance por curso, riesgos próximos y recordatorios locales semanales. |
+| IA, PDF y simulacros | Pendiente | Se implementarán mediante Storage privado y Edge Functions, nunca desde claves dentro de la APK. |
 
-El alcance completo y los 16 casos de uso están en [PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md).
+## Cómo se conecta todo
 
-## Inicio rápido para el equipo
+```mermaid
+flowchart LR
+  A[Estudiante] --> B[APK KODA\nExpo + React Native]
+  B --> C[Planificador local]
+  B --> D[Supabase Auth]
+  D --> E[(PostgreSQL + RLS)]
+  E --> F[Malla oficial y espacio personal]
+  B -. Sprint 6 .-> G[Storage privado + Edge Function]
+  G -.-> H[IA para PDF y estudio]
+```
 
-Esta guía es para una persona que ya recibió acceso al repositorio privado. Si aún no lo recibió, debe enviar su usuario de GitHub al responsable antes de continuar.
+La APK solo contiene configuración pública de Supabase. Las reglas RLS hacen que una cuenta no pueda leer ni escribir los datos de otra.
 
-1. Instala [Node.js 22.13 o superior](https://nodejs.org/), [Git](https://git-scm.com/downloads) y [Visual Studio Code](https://code.visualstudio.com/).
-2. Abre **PowerShell** en la carpeta donde guardarás el proyecto.
-3. Clona el repositorio y entra a él:
+## Empezar desde cero
 
-~~~powershell
+Estas instrucciones son para cualquier integrante que ya tenga acceso al repositorio privado.
+
+1. Instala [Node.js 22.13+](https://nodejs.org/), [Git](https://git-scm.com/downloads) y [Visual Studio Code](https://code.visualstudio.com/).
+2. Abre PowerShell en la carpeta donde guardarás el proyecto.
+3. Clona el repositorio y entra en él:
+
+```powershell
 git clone https://github.com/sebastianrosasq/KODA.git
 cd KODA
-~~~
+```
 
 4. Instala exactamente las dependencias registradas por el equipo:
 
-~~~powershell
+```powershell
 npm ci
-~~~
+```
 
-5. Inicia la aplicación:
+5. Crea tu configuración local sin subir secretos:
 
-~~~powershell
+```powershell
+Copy-Item .env.example .env
+```
+
+6. Pide al responsable la `EXPO_PUBLIC_SUPABASE_URL` y la `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` del proyecto de desarrollo, y colócalas solo en `.env`. No uses una clave `service_role`.
+7. Inicia la app:
+
+```powershell
 npm run start
-~~~
+```
 
-6. Pruébala en un Android con Expo Go o en un emulador. Los pasos detallados están en [GETTING_STARTED.md](docs/GETTING_STARTED.md).
+Para instalar o probar en Android, sigue [GETTING_STARTED.md](docs/GETTING_STARTED.md). Las validaciones de una modificación son:
 
-Para trabajar con la planificación local no se requieren cuentas de Supabase, Firebase u OpenAI. Cuando el responsable active Supabase, cada integrante configurará sus variables públicas solo en su archivo `.env` local; la explicación está en [SPRINT_2_3.md](docs/SPRINT_2_3.md).
+```powershell
+npx tsc --noEmit
+npm run lint
+npx expo-doctor
+```
 
-## Comandos que usaremos
+## Arquitectura del repositorio
 
-| Objetivo | Comando |
-| --- | --- |
-| Iniciar el servidor | npm run start |
-| Abrir Android | npm run android |
-| Revisar tipos | npx tsc --noEmit |
-| Revisar estilo y errores comunes | npm run lint |
-| Diagnosticar Expo y dependencias | npx expo-doctor |
-
-Cuando se agregue una librería de Expo, se usa **npx expo install nombre-del-paquete**, no npm install, para conservar la compatibilidad con Expo SDK 57.
-
-## Estructura del repositorio
-
-~~~text
+```text
 KODA/
 ├── src/app/                 Pantallas y navegación con Expo Router
-├── src/                     Componentes, lógica, hooks y tipos compartidos
-├── assets/                  Íconos e imágenes de la aplicación
-├── supabase/
-│   ├── migrations/          Cambios versionados de la base de datos
-│   └── seed/                Catálogo curricular inicial y sus fuentes
-├── docs/                    Producto, arquitectura, sprints y guías del equipo
-├── .github/workflows/       Validaciones automáticas
-├── app.json                 Configuración pública de Expo
-└── eas.json                 Perfiles para APK de prueba y publicación
-~~~
+├── src/components/          Sistema visual reutilizable
+├── src/features/            Planificador, sincronización, repaso y recordatorios
+├── src/providers/           Sesión, tema y estado del espacio de estudio
+├── src/data/                Catálogo disponible sin conexión
+├── supabase/migrations/     Esquema y políticas RLS versionados
+├── supabase/seed/           Mallas, fuentes y cursos oficialmente contrastados
+├── docs/                    Producto, arquitectura, sprints y guías
+├── app.json                 Configuración de la APK y plugins Expo
+└── eas.json                 Perfiles de compilación Android
+```
 
-## Documentación para orientarse
+## Catálogo curricular: regla de confianza
+
+| Estado | Comportamiento en KODA |
+| --- | --- |
+| `verified` | Se consulta la malla oficial y se sugieren los cursos del ciclo elegido. |
+| `source_identified` | Se permite registrar institución, carrera y ciclo, pero no se inventan cursos. El estudiante puede agregarlos manualmente. |
+
+El detalle de instituciones, planes, fuentes y próximos contrastes está en [CURRICULUM_CATALOG_README.md](supabase/seed/CURRICULUM_CATALOG_README.md).
+
+## Documentación útil
 
 - [Guía de instalación y primer arranque](docs/GETTING_STARTED.md)
 - [Cómo colaborar: ramas, revisiones y commits](CONTRIBUTING.md)
-- [Alcance y casos de uso](docs/PRODUCT_SCOPE.md)
-- [Arquitectura explicada con diagrama](docs/SYSTEM_ARCHITECTURE.md)
-- [Plan de los ocho sprints](docs/SPRINTS.md)
-- [Qué incluye y cómo probar el Sprint 1](docs/SPRINT_1.md)
-- [Qué incluyen los Sprints 2 y 3 y cómo activar Supabase](docs/SPRINT_2_3.md)
+- [Alcance y 16 casos de uso](docs/PRODUCT_SCOPE.md)
+- [Arquitectura, límites de seguridad y recorrido de IA](docs/SYSTEM_ARCHITECTURE.md)
+- [Plan S1–S8](docs/SPRINTS.md)
+- [Detalle técnico de Sprints 2 y 3](docs/SPRINT_2_3.md)
+- [Base segura de IA y documentos del Sprint 6](docs/AI_SETUP.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
-- [Catálogo curricular versionado](supabase/seed/CURRICULUM_CATALOG_README.md)
 
-## Seguridad y datos del equipo
+## Reglas del equipo
 
-- El repositorio es privado. Solo se invitará a integrantes que necesiten contribuir.
-- No se suben archivos .env, claves de OpenAI, credenciales de Firebase, contraseñas, archivos de firma ni datos reales de estudiantes.
-- La APK solo llevará configuración pública. Las acciones sensibles y la IA vivirán en funciones seguras de servidor.
-- Las mallas se conservan con fuente y versión; un cambio de catálogo nunca modifica cursos que un estudiante ya confirmó.
-
-Consulta [ACCESS_AND_SECRETS.md](docs/ACCESS_AND_SECRETS.md) antes de conectar servicios externos.
+- Los commits se escriben en español, claros y centrados en un cambio concreto.
+- Antes de subir cambios, ejecuta TypeScript y lint.
+- No versionar `.env`, claves de OpenAI, contraseñas, tokens personales, archivos de firma ni datos reales de estudiantes.
+- Para librerías Expo usa `npx expo install nombre-del-paquete`; así se conserva compatibilidad con Expo SDK 57.
+- Un curso sugerido nunca reemplaza la decisión del estudiante.

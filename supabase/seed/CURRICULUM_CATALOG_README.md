@@ -5,7 +5,8 @@ Este catálogo acelera el registro: el estudiante elige institución, carrera y 
 ## Alcance del corte inicial
 
 - Instituciones indexadas: TECSUP, UCSM, UCSP, UNSA, IDAT, CERTUS, ISIL, SENATI, CIBERTEC, UTP, UPC, PUCP, UNMSM, UCV y UPN. Son 15 instituciones únicas: TECSUP y UTP ya pertenecían al grupo inicial y no se duplican.
-- Planes activables y con cursos por ciclo: TECSUP / Diseño y Desarrollo de Software; IDAT / Técnico en Programación de Software; UTP / Ingeniería de Sistemas e Informática y Administración de Empresas.
+- Planes activables y con cursos por ciclo: TECSUP / Diseño y Desarrollo de Software; IDAT / Técnico en Programación de Software; UTP / Ingeniería de Sistemas e Informática y Administración de Empresas; UCSM / Ingeniería de Sistemas (plan 2026); UCV / Ingeniería de Sistemas a distancia; UPN / Ingeniería de Sistemas Computacionales (plan 2026).
+- Cobertura cargada: 7 planes activos, 30 ciclos o semestres y 380 cursos. La fuente, versión y fecha de revisión acompañan cada plan.
 - Instituciones con fuente identificada pero no activables: no se deben mostrar como una malla predefinida hasta validar una fuente oficial con la versión, modalidad y cursos por ciclo.
 
 ## Regla de calidad
@@ -29,7 +30,7 @@ Este catálogo acelera el registro: el estudiante elige institución, carrera y 
 
 ## Próxima ampliación curada
 
-1. Importar y contrastar por semestre las tres prioridades de Arequipa: UCSM / Ingeniería de Sistemas (2026), UCSP / Ciencia de la Computación (2026) y UNSA / Ingeniería de Sistemas (2025).
-2. Completar las fuentes ya indexadas (CERTUS, ISIL, CIBERTEC, UPC, PUCP, UNMSM, UCV y UPN).
+1. Importar y contrastar por semestre las dos prioridades pendientes de Arequipa: UCSP / Ciencia de la Computación (2026) y UNSA / Ingeniería de Sistemas (2025).
+2. Completar las fuentes ya indexadas (CERTUS, ISIL, CIBERTEC, UPC, PUCP, UNMSM y SENATI).
 3. Incorporar cuatro familias no tecnológicas: Administración/Negocios, Salud, Ingeniería Industrial y Diseño/Comunicaciones.
 4. Añadir sedes y modalidades solo cuando modifiquen realmente la malla.

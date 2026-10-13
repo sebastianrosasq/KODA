@@ -16,6 +16,7 @@ import {
   KodaText,
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
+import { scheduleStudyReminders } from '@/features/reminders/study-reminders';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaData } from '@/providers/koda-data-provider';
@@ -23,17 +24,33 @@ import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function ProfileScreen() {
   const { colorScheme, theme, toggleColorScheme } = useKodaTheme();
-  const { workspace, addCourse, removeCourse, setCourseActive } = useKodaData();
+  const { workspace, addCourse, removeCourse, setCourseActive, syncError, syncState } = useKodaData();
   const { isConfigured, session, status, signIn, signOut, signUp } = useKodaAuth();
   const [isAcademicModalVisible, setAcademicModalVisible] = useState(false);
   const [isAccountModalVisible, setAccountModalVisible] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
+  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
+  const [isSchedulingReminders, setSchedulingReminders] = useState(false);
   const isDark = colorScheme === 'dark';
   const termLabel = getCatalogProgram(workspace.profile.institutionSlug, workspace.profile.programSlug)?.termLabel ?? 'Ciclo';
 
   const submitCourse = () => {
     addCourse(newCourseName);
     setNewCourseName('');
+  };
+
+  const updateReminders = async () => {
+    setSchedulingReminders(true);
+    try {
+      const result = await scheduleStudyReminders(workspace.availability);
+      setReminderMessage(result.status === 'scheduled'
+        ? `${result.count} recordatorios semanales actualizados.`
+        : result.message);
+    } catch {
+      setReminderMessage('No se pudieron actualizar los recordatorios en este dispositivo.');
+    } finally {
+      setSchedulingReminders(false);
+    }
   };
 
   return (
@@ -146,6 +163,26 @@ export default function ProfileScreen() {
             La APK nunca guardará claves de IA ni permisos de administrador. La sincronización usará reglas por estudiante.
           </KodaText>
         </KodaCard>
+        {status === 'signed_in' ? (
+          <Text style={[styles.syncText, { color: syncState === 'error' ? theme.warning : theme.textTertiary }]}>
+            {syncState === 'synced' ? 'Tus cambios están sincronizados.' : syncState === 'syncing' ? 'Sincronizando tus cambios…' : syncError ?? 'Los cambios se guardan en este dispositivo.'}
+          </Text>
+        ) : null}
+      </KodaReveal>
+
+      <KodaReveal delay={225} style={styles.sectionBlock}>
+        <KodaSectionTitle title="Recordatorios" />
+        <KodaCard style={styles.reminderCard}>
+          <View style={[styles.preferenceIcon, { backgroundColor: theme.accentSoft }]}>
+            <Ionicons color={theme.accent} name="notifications-outline" size={19} />
+          </View>
+          <View style={styles.preferenceCopy}>
+            <Text style={[styles.preferenceTitle, { color: theme.text }]}>Aviso 15 minutos antes</Text>
+            <Text style={[styles.preferenceText, { color: theme.textSecondary }]}>Se crean recordatorios semanales con los bloques de tu plan actual.</Text>
+          </View>
+          <KodaButton disabled={isSchedulingReminders || !workspace.availability.length} label={isSchedulingReminders ? 'Actualizando…' : 'Activar'} onPress={() => void updateReminders()} />
+        </KodaCard>
+        {reminderMessage ? <Text style={[styles.syncText, { color: theme.textSecondary }]}>{reminderMessage}</Text> : null}
       </KodaReveal>
 
       {isAcademicModalVisible ? <AcademicProfileModal onClose={() => setAcademicModalVisible(false)} /> : null}
@@ -346,6 +383,8 @@ const styles = StyleSheet.create({
   accountButton: { alignSelf: 'flex-start' },
   privacyCard: { alignItems: 'flex-start', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   privacyText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  syncText: { fontSize: 12, fontWeight: '600', lineHeight: 17, paddingHorizontal: KodaSpacing.sm },
+  reminderCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   modalOverlay: { alignItems: 'center', flex: 1, justifyContent: 'flex-end', padding: KodaSpacing.md },
   modalCard: { borderRadius: KodaRadius.lg, borderWidth: 1, maxHeight: '90%', maxWidth: 560, padding: KodaSpacing.xl, width: '100%' },
   modalContent: { gap: KodaSpacing.lg },

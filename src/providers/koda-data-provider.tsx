@@ -10,6 +10,7 @@ import type {
   KodaWorkspace,
   StudentAcademicProfile,
   StudentExam,
+  StudyFlashcard,
   StudyTopic,
 } from '@/types/koda-domain';
 
@@ -49,6 +50,29 @@ const defaultWorkspace: KodaWorkspace = {
     { id: 'web-rest', courseId: 'web', name: 'Diseño de endpoints REST', priority: 2, completed: false },
     { id: 'english-vocabulary', courseId: 'english', name: 'Vocabulario técnico', priority: 1, completed: false },
   ],
+  flashcards: [
+    {
+      id: 'flashcard-quality',
+      courseId: 'architecture',
+      prompt: '¿Qué atributo de calidad mide la facilidad para modificar un sistema?',
+      answer: 'La modificabilidad: el esfuerzo necesario para cambiar, corregir o ampliar un sistema.',
+      mastery: 1,
+    },
+    {
+      id: 'flashcard-normalization',
+      courseId: 'database',
+      prompt: '¿Cuál es el objetivo de la normalización de una base de datos?',
+      answer: 'Reducir redundancia y dependencias anómalas sin perder información importante.',
+      mastery: 0,
+    },
+    {
+      id: 'flashcard-rest',
+      courseId: 'web',
+      prompt: '¿Qué comunica un endpoint REST bien diseñado?',
+      answer: 'Un recurso y una acción coherente mediante su ruta, método HTTP y respuesta.',
+      mastery: 0,
+    },
+  ],
   availability: [
     { id: 'today-1830', day: 'Hoy', startsAt: '18:30', durationMinutes: 45 },
     { id: 'today-2000', day: 'Hoy', startsAt: '20:00', durationMinutes: 50 },
@@ -58,6 +82,20 @@ const defaultWorkspace: KodaWorkspace = {
   ],
   completedSessionIds: ['today-1830'],
 };
+
+function normalizeWorkspace(candidate: Partial<KodaWorkspace>): KodaWorkspace {
+  return {
+    ...defaultWorkspace,
+    ...candidate,
+    profile: candidate.profile ?? defaultWorkspace.profile,
+    courses: candidate.courses ?? defaultWorkspace.courses,
+    exams: candidate.exams ?? defaultWorkspace.exams,
+    topics: candidate.topics ?? defaultWorkspace.topics,
+    flashcards: candidate.flashcards ?? [],
+    availability: candidate.availability ?? defaultWorkspace.availability,
+    completedSessionIds: candidate.completedSessionIds ?? defaultWorkspace.completedSessionIds,
+  };
+}
 
 type KodaDataContextValue = {
   hydrated: boolean;
@@ -73,6 +111,8 @@ type KodaDataContextValue = {
   addExam: (exam: Omit<StudentExam, 'id'>) => void;
   addTopic: (topic: Omit<StudyTopic, 'id' | 'completed'>) => void;
   toggleTopic: (topicId: string) => void;
+  addFlashcard: (flashcard: Omit<StudyFlashcard, 'id' | 'mastery'>) => void;
+  reviewFlashcard: (flashcardId: string, remembered: boolean) => void;
   updateAvailability: (availability: AvailabilityBlock[]) => void;
   completeSession: (sessionId: string) => void;
   dashboard: {
@@ -119,7 +159,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     void AsyncStorage.getItem(STORAGE_KEY)
       .then((storedWorkspace) => {
         if (!storedWorkspace || !active) return;
-        const restored = JSON.parse(storedWorkspace) as KodaWorkspace;
+        const restored = normalizeWorkspace(JSON.parse(storedWorkspace) as Partial<KodaWorkspace>);
         workspaceRef.current = restored;
         setWorkspace(restored);
       })
@@ -241,6 +281,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       courses: current.courses.filter((course) => course.id !== courseId),
       exams: current.exams.filter((exam) => exam.courseId !== courseId),
       topics: current.topics.filter((topic) => topic.courseId !== courseId),
+      flashcards: current.flashcards.filter((flashcard) => flashcard.courseId !== courseId),
     }));
   }, [updateWorkspace]);
 
@@ -268,6 +309,29 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     updateWorkspace((current) => ({
       ...current,
       topics: current.topics.map((topic) => (topic.id === topicId ? { ...topic, completed: !topic.completed } : topic)),
+    }));
+  }, [updateWorkspace]);
+
+  const addFlashcard = useCallback((flashcard: Omit<StudyFlashcard, 'id' | 'mastery'>) => {
+    const prompt = flashcard.prompt.trim();
+    const answer = flashcard.answer.trim();
+    if (!prompt || !answer) return;
+    updateWorkspace((current) => ({
+      ...current,
+      flashcards: [...current.flashcards, { ...flashcard, prompt, answer, id: createId('flashcard'), mastery: 0 }],
+    }));
+  }, [updateWorkspace]);
+
+  const reviewFlashcard = useCallback((flashcardId: string, remembered: boolean) => {
+    updateWorkspace((current) => ({
+      ...current,
+      flashcards: current.flashcards.map((flashcard) => {
+        if (flashcard.id !== flashcardId) return flashcard;
+        const nextMastery = remembered
+          ? Math.min(3, flashcard.mastery + 1)
+          : Math.max(0, flashcard.mastery - 1);
+        return { ...flashcard, mastery: nextMastery as StudyFlashcard['mastery'], lastReviewedAt: new Date().toISOString() };
+      }),
     }));
   }, [updateWorkspace]);
 
@@ -335,7 +399,9 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       setCourseActive,
       addExam,
       addTopic,
+      addFlashcard,
       toggleTopic,
+      reviewFlashcard,
       updateAvailability,
       completeSession,
       dashboard,
@@ -344,12 +410,14 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       addCourse,
       addExam,
       addTopic,
+      addFlashcard,
       completeSession,
       dashboard,
       hydrated,
       plan,
       preloadCourses,
       removeCourse,
+      reviewFlashcard,
       setCourseActive,
       toggleTopic,
       updateAvailability,

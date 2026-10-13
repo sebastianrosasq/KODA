@@ -30,6 +30,13 @@
           "image": "./assets/images/koda-mark.png",
           "imageWidth": 160
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#6D5FA8",
+          "defaultChannel": "study-reminders"
+        }
       ]
     ],
     "experiments": {

@@ -34,6 +34,15 @@ export type StudyTopic = {
   completed: boolean;
 };
 
+export type StudyFlashcard = {
+  id: string;
+  courseId: string;
+  prompt: string;
+  answer: string;
+  mastery: 0 | 1 | 2 | 3;
+  lastReviewedAt?: string;
+};
+
 export type DayLabel = 'Hoy' | 'Lun' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
 
 export type AvailabilityBlock = {
@@ -62,6 +71,7 @@ export type KodaWorkspace = {
   courses: StudentCourse[];
   exams: StudentExam[];
   topics: StudyTopic[];
+  flashcards: StudyFlashcard[];
   availability: AvailabilityBlock[];
   completedSessionIds: string[];
 };

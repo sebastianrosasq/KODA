@@ -42,6 +42,16 @@ type RemoteTopic = {
   completed_at: string | null;
 };
 
+type RemoteFlashcard = {
+  id: string;
+  client_key: string;
+  course_id: string;
+  prompt: string;
+  answer: string;
+  mastery: number;
+  last_reviewed_at: string | null;
+};
+
 type RemoteAvailability = {
   id: string;
   client_key: string;
@@ -151,7 +161,7 @@ async function getCurriculumIds(profile: StudentAcademicProfile) {
   return { institutionId: institution.id, programId: program.id, planId: plan?.id ?? null };
 }
 
-async function removeRows(table: 'student_courses' | 'student_exams' | 'student_topics' | 'student_availability_blocks' | 'student_study_sessions', ids: string[]) {
+async function removeRows(table: 'student_courses' | 'student_exams' | 'student_topics' | 'student_flashcards' | 'student_availability_blocks' | 'student_study_sessions', ids: string[]) {
   if (!ids.length) return;
   const { error } = await getClient().from(table).delete().in('id', ids);
   throwIfError(error);
@@ -295,6 +305,33 @@ export async function syncWorkspaceToSupabase(userId: string, workspace: KodaWor
     .filter((topic) => !desiredTopicKeys.has(topic.client_key))
     .map((topic) => topic.id));
 
+  const { data: existingFlashcards, error: existingFlashcardsError } = await client
+    .from('student_flashcards')
+    .select('id, client_key')
+    .in('course_id', courseIds);
+  throwIfError(existingFlashcardsError);
+  const { error: flashcardError } = await client
+    .from('student_flashcards')
+    .upsert(
+      workspace.flashcards.flatMap((flashcard) => {
+        const courseId = courseIdByKey.get(flashcard.courseId);
+        return courseId ? [{
+          course_id: courseId,
+          client_key: flashcard.id,
+          prompt: flashcard.prompt,
+          answer: flashcard.answer,
+          mastery: flashcard.mastery,
+          last_reviewed_at: flashcard.lastReviewedAt ?? null,
+        }] : [];
+      }),
+      { onConflict: 'course_id,client_key' },
+    );
+  throwIfError(flashcardError);
+  const desiredFlashcardKeys = new Set(workspace.flashcards.map((flashcard) => flashcard.id));
+  await removeRows('student_flashcards', (existingFlashcards ?? [])
+    .filter((flashcard) => !desiredFlashcardKeys.has(flashcard.client_key))
+    .map((flashcard) => flashcard.id));
+
   const { data: existingSessions, error: existingSessionsError } = await client
     .from('student_study_sessions')
     .select('id, client_key')
@@ -319,7 +356,7 @@ export async function syncWorkspaceToSupabase(userId: string, workspace: KodaWor
           rationale: session.rationale,
         }] : [];
       }),
-      { onConflict: 'client_key' },
+      { onConflict: 'course_id,client_key' },
     );
   throwIfError(sessionError);
   const desiredSessionKeys = new Set(plan.map((session) => session.id));
@@ -370,16 +407,18 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
   const courses = (courseRows ?? []) as RemoteCourse[];
   const courseIdToKey = new Map(courses.map((course) => [course.id, course.client_key]));
   const courseIds = courses.map((course) => course.id);
-  if (!courseIds.length) return { ...fallback, profile: remoteProfile, courses: [], exams: [], topics: [], availability: [], completedSessionIds: [] };
+  if (!courseIds.length) return { ...fallback, profile: remoteProfile, courses: [], exams: [], topics: [], flashcards: [], availability: [], completedSessionIds: [] };
 
-  const [{ data: examRows, error: examError }, { data: topicRows, error: topicError }, { data: availabilityRows, error: availabilityError }, { data: sessionRows, error: sessionError }] = await Promise.all([
+  const [{ data: examRows, error: examError }, { data: topicRows, error: topicError }, { data: flashcardRows, error: flashcardError }, { data: availabilityRows, error: availabilityError }, { data: sessionRows, error: sessionError }] = await Promise.all([
     client.from('student_exams').select('id, client_key, course_id, title, scheduled_at, difficulty').in('course_id', courseIds),
     client.from('student_topics').select('id, client_key, course_id, name, priority, completed_at').in('course_id', courseIds),
+    client.from('student_flashcards').select('id, client_key, course_id, prompt, answer, mastery, last_reviewed_at').in('course_id', courseIds),
     client.from('student_availability_blocks').select('id, client_key, weekday, starts_at, duration_minutes').eq('profile_id', profile.id),
     client.from('student_study_sessions').select('client_key, status').in('course_id', courseIds),
   ]);
   throwIfError(examError);
   throwIfError(topicError);
+  throwIfError(flashcardError);
   throwIfError(availabilityError);
   throwIfError(sessionError);
 
@@ -411,6 +450,17 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
         name: topic.name,
         priority: asPriority(topic.priority),
         completed: Boolean(topic.completed_at),
+      }] : [];
+    }),
+    flashcards: ((flashcardRows ?? []) as RemoteFlashcard[]).flatMap((flashcard) => {
+      const courseId = courseIdToKey.get(flashcard.course_id);
+      return courseId ? [{
+        id: flashcard.client_key,
+        courseId,
+        prompt: flashcard.prompt,
+        answer: flashcard.answer,
+        mastery: Math.min(3, Math.max(0, flashcard.mastery)) as 0 | 1 | 2 | 3,
+        lastReviewedAt: flashcard.last_reviewed_at ?? undefined,
       }] : [];
     }),
     availability: ((availabilityRows ?? []) as RemoteAvailability[]).map((block) => ({

@@ -66,5 +66,5 @@ create unique index if not exists student_topics_course_client_key_idx
   on public.student_topics (course_id, client_key);
 create unique index if not exists student_availability_profile_client_key_idx
   on public.student_availability_blocks (profile_id, client_key);
-create unique index if not exists student_study_sessions_client_key_idx
-  on public.student_study_sessions (client_key);
+create unique index if not exists student_study_sessions_course_client_key_idx
+  on public.student_study_sessions (course_id, client_key);

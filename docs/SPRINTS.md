@@ -16,5 +16,8 @@ Cada sprint termina con una demo en Android y criterios de aceptación verificab
 ## Estado de implementación
 
 - S1 está integrado: navegación, tema, componentes base e identidad visual.
-- S2 y S3 tienen una implementación local funcional y migraciones listas. La autenticación y sincronización remotas se activarán cuando el proyecto Supabase de KODA sea vinculado por su responsable.
+- S2 y S3 están integrados con Supabase: autenticación, RLS, catálogo oficial, sincronización de perfil, cursos, exámenes, temas, disponibilidad y sesiones.
+- S4 ya contiene flashcards creadas por el estudiante y sincronizadas. Materiales, audios y carga privada de archivos continúan en el trabajo de Storage del S6.
+- S5 cuenta con progreso derivado del avance real y recordatorios locales semanales; el envío remoto con FCM/Expo Push se cerrará en la etapa de release.
+- S6 inicia con Storage privado y una Edge Function autenticada para PDFs. Falta configurar una clave de servidor, cuotas, la pantalla de carga y pruebas físicas antes de cerrarlo.
 - La comprobación visual integral en Android se consolidará antes de cerrar el S8, sin reemplazar las validaciones de código de cada sprint.
