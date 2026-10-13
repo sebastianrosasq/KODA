@@ -8,6 +8,27 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
+function toFriendlyAuthMessage(message: string | null, mode: 'signIn' | 'signUp' | 'google') {
+  if (!message) {
+    if (mode === 'signIn') return 'Sesión iniciada.';
+    if (mode === 'signUp') return 'Cuenta creada. Revisa tu correo si requiere confirmación.';
+    return 'Continúa con tu cuenta de Google para terminar el acceso.';
+  }
+
+  const normalized = message.toLowerCase();
+  if (normalized.includes('email rate limit exceeded')) {
+    return 'Se solicitaron demasiados correos de confirmación. Espera un momento antes de intentarlo otra vez o continúa con Google.';
+  }
+  if (normalized.includes('email not confirmed')) {
+    return 'Confirma tu correo desde el mensaje que recibiste antes de iniciar sesión.';
+  }
+  if (normalized.includes('invalid login credentials')) {
+    return 'El correo o la contraseña no son correctos.';
+  }
+
+  return message;
+}
+
 export function AccountModal({ onClose, required = false }: { onClose: () => void; required?: boolean }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
@@ -39,7 +60,7 @@ export function AccountModal({ onClose, required = false }: { onClose: () => voi
     try {
       setLoading(true);
       const result = mode === 'signIn' ? await signIn(normalizedEmail, password) : await signUp(normalizedEmail, password);
-      setMessage(result ?? (mode === 'signIn' ? 'Sesión iniciada.' : 'Cuenta creada. Revisa tu correo si requiere confirmación.'));
+      setMessage(toFriendlyAuthMessage(result, mode));
     } catch {
       setMessage('No se pudo conectar con el acceso. Revisa tu conexión e inténtalo nuevamente.');
     } finally {
@@ -48,10 +69,15 @@ export function AccountModal({ onClose, required = false }: { onClose: () => voi
   };
 
   const submitGoogle = async () => {
-    setLoading(true);
-    const result = await signInWithGoogle();
-    setLoading(false);
-    setMessage(result ?? 'Sesión iniciada con Google.');
+    try {
+      setLoading(true);
+      const result = await signInWithGoogle();
+      setMessage(toFriendlyAuthMessage(result, 'google'));
+    } catch {
+      setMessage('No se pudo iniciar el acceso con Google. Inténtalo nuevamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const close = required ? () => undefined : onClose;
