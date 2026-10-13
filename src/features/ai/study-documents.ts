@@ -153,10 +153,13 @@ export function asStudyDocumentAnalysis(value: unknown): StudyDocumentAnalysis |
   };
 }
 
-function mapDocument(row: StudyDocumentRow): StudyDocument {
+function mapDocument(row: StudyDocumentRow, courseKeyById: Map<string, string>): StudyDocument {
   return {
     id: row.id,
-    courseId: row.course_id,
+    // La aplicación conserva una clave local estable por curso para trabajar
+    // sin conexión. Las tablas relacionadas usan el UUID de la base de datos,
+    // que se convierte aquí para que las pantallas no dependan de ese detalle.
+    courseId: row.course_id ? courseKeyById.get(row.course_id) ?? null : null,
     originalFilename: row.original_filename,
     contentKind: row.content_kind,
     analysisStatus: row.analysis_status,
@@ -165,6 +168,33 @@ function mapDocument(row: StudyDocumentRow): StudyDocument {
     lastError: row.last_error,
     createdAt: row.created_at,
   };
+}
+
+type RemoteCourseReference = {
+  id: string;
+  client_key: string;
+};
+
+async function getCourseReferences() {
+  const { data, error } = await clientOrThrow()
+    .from('student_courses')
+    .select('id, client_key');
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as RemoteCourseReference[];
+  return {
+    databaseIdByClientKey: new Map(rows.map((course) => [course.client_key, course.id])),
+    clientKeyByDatabaseId: new Map(rows.map((course) => [course.id, course.client_key])),
+  };
+}
+
+async function getDatabaseCourseId(clientCourseId: string) {
+  const { databaseIdByClientKey } = await getCourseReferences();
+  const databaseCourseId = databaseIdByClientKey.get(clientCourseId);
+  if (!databaseCourseId) {
+    throw new Error('Tus cursos todavía se están sincronizando. Espera unos segundos e inténtalo nuevamente.');
+  }
+  return databaseCourseId;
 }
 
 async function readAsset(asset: DocumentPickerAsset) {
@@ -217,12 +247,15 @@ export function friendlyFunctionError(error: unknown, fallback = 'No se pudo com
 
 export async function listStudyDocuments() {
   const client = clientOrThrow();
-  const { data, error } = await client
-    .from('student_study_documents')
-    .select('id, course_id, original_filename, content_kind, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
-    .order('created_at', { ascending: false });
+  const [{ data, error }, { clientKeyByDatabaseId }] = await Promise.all([
+    client
+      .from('student_study_documents')
+      .select('id, course_id, original_filename, content_kind, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
+      .order('created_at', { ascending: false }),
+    getCourseReferences(),
+  ]);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as StudyDocumentRow[]).map(mapDocument);
+  return ((data ?? []) as StudyDocumentRow[]).map((document) => mapDocument(document, clientKeyByDatabaseId));
 }
 
 export async function getAiDocumentConsent() {
@@ -254,6 +287,7 @@ export async function uploadStudyDocument({ asset, courseId }: { asset: Document
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError || !userData.user) throw new Error('Inicia sesión para guardar un material.');
   const descriptor = getAssetDescriptor(asset);
+  const databaseCourseId = await getDatabaseCourseId(courseId);
 
   const file = await readAsset(asset);
   if (!file.size || file.size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
@@ -263,7 +297,7 @@ export async function uploadStudyDocument({ asset, courseId }: { asset: Document
     .from('student_study_documents')
     .insert({
       user_id: userData.user.id,
-      course_id: courseId,
+      course_id: databaseCourseId,
       storage_path: storagePath,
       original_filename: asset.name.slice(0, 180),
       mime_type: descriptor.mimeType,
@@ -333,9 +367,10 @@ export async function recordQuizAttempt(input: {
   const client = clientOrThrow();
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError || !userData.user) return;
+  const databaseCourseId = input.courseId ? await getDatabaseCourseId(input.courseId) : null;
   const { error } = await client.from('student_quiz_attempts').insert({
     user_id: userData.user.id,
-    course_id: input.courseId,
+    course_id: databaseCourseId,
     document_id: input.documentId,
     source: input.source,
     question_count: input.questionCount,
@@ -346,15 +381,18 @@ export async function recordQuizAttempt(input: {
 }
 
 export async function listQuizAttempts() {
-  const { data, error } = await clientOrThrow()
-    .from('student_quiz_attempts')
-    .select('id, course_id, document_id, source, question_count, correct_count, completed_at')
-    .order('completed_at', { ascending: false })
-    .limit(30);
+  const [{ data, error }, { clientKeyByDatabaseId }] = await Promise.all([
+    clientOrThrow()
+      .from('student_quiz_attempts')
+      .select('id, course_id, document_id, source, question_count, correct_count, completed_at')
+      .order('completed_at', { ascending: false })
+      .limit(30),
+    getCourseReferences(),
+  ]);
   if (error) throw new Error(error.message);
   return ((data ?? []) as QuizAttemptRow[]).map((attempt) => ({
     id: attempt.id,
-    courseId: attempt.course_id,
+    courseId: attempt.course_id ? clientKeyByDatabaseId.get(attempt.course_id) ?? null : null,
     documentId: attempt.document_id,
     source: attempt.source,
     questionCount: attempt.question_count,
