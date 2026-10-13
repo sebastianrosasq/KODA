@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaScreen } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
@@ -16,6 +16,24 @@ const welcomeMessage: CoachMessage = {
   role: 'assistant',
   text: 'Hola, soy KODA. Puedo ayudarte a preparar tu examen, explicarte un concepto o preguntarte sobre un material que ya analizaste.',
 };
+
+function CoachMessageText({ message, color }: { message: CoachMessage; color: string }) {
+  const fragments = message.text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+
+  return (
+    <Text style={[styles.messageText, { color, fontWeight: message.role === 'student' ? '700' : '500' }]}>
+      {fragments.map((fragment, index) => {
+        if (fragment.startsWith('**') && fragment.endsWith('**')) {
+          return <Text key={`${index}-${fragment}`} style={styles.messageStrong}>{fragment.slice(2, -2)}</Text>;
+        }
+        if (fragment.startsWith('*') && fragment.endsWith('*')) {
+          return <Text key={`${index}-${fragment}`} style={styles.messageEmphasis}>{fragment.slice(1, -1)}</Text>;
+        }
+        return fragment;
+      })}
+    </Text>
+  );
+}
 
 export default function CoachScreen() {
   const { theme } = useKodaTheme();
@@ -145,7 +163,7 @@ export default function CoachScreen() {
           <View key={message.id} style={[styles.messageRow, message.role === 'student' ? styles.studentRow : styles.assistantRow]}>
             {message.role === 'assistant' ? <Ionicons color={theme.accent} name="sparkles-outline" size={18} style={styles.messageIcon} /> : null}
             <View style={[styles.messageBubble, { backgroundColor: message.role === 'student' ? theme.accent : theme.surfaceMuted, borderColor: message.role === 'student' ? theme.accent : theme.border }]}>
-              <Text style={[styles.messageText, { color: message.role === 'student' ? theme.onAccent : theme.text }]}>{message.text}</Text>
+              <CoachMessageText color={message.role === 'student' ? theme.onAccent : theme.text} message={message} />
             </View>
           </View>
         ))}
@@ -166,8 +184,16 @@ export default function CoachScreen() {
           maxLength={1200}
           multiline
           onChangeText={setPrompt}
+          onKeyPress={(event) => {
+            const nativeEvent = event.nativeEvent as typeof event.nativeEvent & { shiftKey?: boolean };
+            if (Platform.OS !== 'web' || nativeEvent.key !== 'Enter' || nativeEvent.shiftKey) return;
+            event.preventDefault();
+            void submit();
+          }}
           placeholder="Ejemplo: explícamelo con un caso práctico"
           placeholderTextColor={theme.textTertiary}
+          returnKeyType="send"
+          submitBehavior={Platform.OS === 'web' ? 'newline' : 'submit'}
           style={[styles.input, { color: theme.text }]}
           textAlignVertical="top"
           value={prompt}
@@ -197,7 +223,9 @@ const styles = StyleSheet.create({
   studentRow: { alignSelf: 'flex-end', flexDirection: 'row-reverse' },
   messageIcon: { marginBottom: KodaSpacing.sm },
   messageBubble: { borderRadius: KodaRadius.md, borderWidth: 1, maxWidth: '86%', padding: KodaSpacing.md },
-  messageText: { fontSize: 14, fontWeight: '600', lineHeight: 21 },
+  messageText: { fontSize: 14, lineHeight: 21 },
+  messageStrong: { fontWeight: '900' },
+  messageEmphasis: { fontStyle: 'italic' },
   typing: { fontSize: 13, fontWeight: '600' },
   composer: { gap: KodaSpacing.md, padding: KodaSpacing.md },
   input: { fontSize: 15, fontWeight: '600', lineHeight: 22, minHeight: 76, padding: KodaSpacing.xs },
