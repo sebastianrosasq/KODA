@@ -2,7 +2,7 @@
 
 KODA es una aplicación móvil para estudiantes peruanos durante la semana de exámenes. Organiza cursos, exámenes y temas; convierte el tiempo disponible en un plan de estudio, facilita el repaso y muestra el progreso real.
 
-> Estado actual: la preparación técnica terminó. El equipo puede iniciar el Sprint 1. La plantilla de Expo aún no es la interfaz final de KODA.
+> Estado actual: Sprint 1 en progreso. KODA ya tiene su navegación móvil, identidad visual premium y una demo funcional para Android; los datos actuales son de demostración local.
 
 ## Qué resolverá KODA
 
@@ -78,6 +78,7 @@ KODA/
 - [Alcance y casos de uso](docs/PRODUCT_SCOPE.md)
 - [Arquitectura explicada con diagrama](docs/SYSTEM_ARCHITECTURE.md)
 - [Plan de los ocho sprints](docs/SPRINTS.md)
+- [Qué incluye y cómo probar el Sprint 1](docs/SPRINT_1.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
 - [Catálogo curricular versionado](supabase/seed/CURRICULUM_CATALOG_README.md)
 
