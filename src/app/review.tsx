@@ -141,7 +141,7 @@ export default function ReviewScreen() {
         </View>
         <View style={styles.materialsCopy}>
           <Text style={[styles.materialsTitle, { color: theme.text }]}>Convierte tus apuntes en práctica</Text>
-          <Text style={[styles.materialsDetail, { color: theme.textSecondary }]}>Sube un PDF privado para obtener un resumen, tarjetas y un simulacro revisable.</Text>
+          <Text style={[styles.materialsDetail, { color: theme.textSecondary }]}>Sube un PDF o audio privado para obtener un resumen, tarjetas y un simulacro revisable.</Text>
         </View>
         <KodaButton icon="sparkles-outline" label="Materiales" onPress={() => router.push('/materials')} variant="secondary" />
       </KodaCard>

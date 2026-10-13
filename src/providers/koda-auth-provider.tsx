@@ -3,7 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { AppState, Platform } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { isSupabaseConfigured, supabase, supabasePublicConfig } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -74,6 +74,22 @@ export function KodaAuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     if (!supabase) return 'Conecta el proyecto Supabase para habilitar el acceso.';
+
+    // Evita navegar a la respuesta JSON de Supabase cuando el administrador aún
+    // no habilitó Google. La clave publishable es segura para consultar ajustes públicos.
+    if (supabasePublicConfig) {
+      try {
+        const response = await fetch(`${supabasePublicConfig.url}/auth/v1/settings`, {
+          headers: { apikey: supabasePublicConfig.publishableKey },
+        });
+        const settings = await response.json() as { external?: { google?: boolean } };
+        if (response.ok && settings.external?.google !== true) {
+          return 'Google aún no está habilitado en KODA. Mientras lo configuramos, crea tu cuenta con correo y contraseña.';
+        }
+      } catch {
+        // Si no se puede consultar este ajuste público, Supabase informará el error real al iniciar OAuth.
+      }
+    }
 
     if (Platform.OS === 'web') {
       const { error } = await supabase.auth.signInWithOAuth({

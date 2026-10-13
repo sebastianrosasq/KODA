@@ -8,7 +8,7 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
-export function AccountModal({ onClose }: { onClose: () => void }) {
+export function AccountModal({ onClose, required = false }: { onClose: () => void; required?: boolean }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
   const { isConfigured, signIn, signInWithGoogle, signUp } = useKodaAuth();
@@ -31,16 +31,23 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
     setMessage(result ?? 'Sesión iniciada con Google.');
   };
 
+  const close = required ? () => undefined : onClose;
+
   return (
-    <Modal animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={onClose} transparent visible>
-      <Pressable accessibilityLabel="Cerrar acceso a cuenta" onPress={onClose} style={[styles.overlay, { backgroundColor: theme.overlay + '99' }]}>
+    <Modal animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={close} transparent visible>
+      <Pressable
+        accessibilityLabel={required ? undefined : 'Cerrar acceso a cuenta'}
+        onPress={required ? undefined : onClose}
+        style={[styles.overlay, { backgroundColor: theme.overlay + '99' }]}>
         <Pressable onPress={() => undefined} style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: theme.text }]}>Tu cuenta KODA</Text>
-              <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Guarda tu avance y continúa desde cualquier dispositivo.</Text>
+              <Text style={[styles.title, { color: theme.text }]}>{required ? 'Entra a KODA' : 'Tu cuenta KODA'}</Text>
+              <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+                {required ? 'Crea tu cuenta o inicia sesión para preparar tu espacio de estudio.' : 'Guarda tu avance y continúa desde cualquier dispositivo.'}
+              </Text>
             </View>
-            <KodaIconButton icon="close" label="Cerrar" onPress={onClose} />
+            {!required ? <KodaIconButton icon="close" label="Cerrar" onPress={onClose} /> : null}
           </View>
 
           {!isConfigured ? (

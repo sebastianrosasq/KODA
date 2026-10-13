@@ -3,7 +3,35 @@ import type { DocumentPickerAsset } from 'expo-document-picker';
 import { supabase } from '@/lib/supabase';
 
 const DOCUMENT_BUCKET = 'koda-study-documents';
-const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_STUDY_MATERIAL_BYTES = 12 * 1024 * 1024;
+
+export type StudyMaterialKind = 'pdf' | 'audio';
+
+const mimeTypesByExtension: Record<string, { kind: StudyMaterialKind; mimeType: string }> = {
+  pdf: { kind: 'pdf', mimeType: 'application/pdf' },
+  mp3: { kind: 'audio', mimeType: 'audio/mpeg' },
+  wav: { kind: 'audio', mimeType: 'audio/wav' },
+  aac: { kind: 'audio', mimeType: 'audio/aac' },
+  ogg: { kind: 'audio', mimeType: 'audio/ogg' },
+  flac: { kind: 'audio', mimeType: 'audio/flac' },
+  webm: { kind: 'audio', mimeType: 'audio/webm' },
+  m4a: { kind: 'audio', mimeType: 'audio/m4a' },
+};
+
+const normalizedMimeTypes: Record<string, { kind: StudyMaterialKind; mimeType: string }> = {
+  'application/pdf': { kind: 'pdf', mimeType: 'application/pdf' },
+  'audio/mpeg': { kind: 'audio', mimeType: 'audio/mpeg' },
+  'audio/mp3': { kind: 'audio', mimeType: 'audio/mpeg' },
+  'audio/wav': { kind: 'audio', mimeType: 'audio/wav' },
+  'audio/x-wav': { kind: 'audio', mimeType: 'audio/wav' },
+  'audio/aac': { kind: 'audio', mimeType: 'audio/aac' },
+  'audio/ogg': { kind: 'audio', mimeType: 'audio/ogg' },
+  'audio/flac': { kind: 'audio', mimeType: 'audio/flac' },
+  'audio/webm': { kind: 'audio', mimeType: 'audio/webm' },
+  'audio/m4a': { kind: 'audio', mimeType: 'audio/m4a' },
+  'audio/mp4': { kind: 'audio', mimeType: 'audio/m4a' },
+  'audio/x-m4a': { kind: 'audio', mimeType: 'audio/m4a' },
+};
 
 export type GeneratedFlashcard = {
   question: string;
@@ -29,6 +57,7 @@ export type StudyDocument = {
   id: string;
   courseId: string | null;
   originalFilename: string;
+  contentKind: StudyMaterialKind;
   analysisStatus: 'ready' | 'processing' | 'completed' | 'failed';
   analysis: StudyDocumentAnalysis | null;
   flashcardsImportedAt: string | null;
@@ -50,6 +79,7 @@ type StudyDocumentRow = {
   id: string;
   course_id: string | null;
   original_filename: string;
+  content_kind: StudyMaterialKind;
   analysis_status: StudyDocument['analysisStatus'];
   analysis: unknown;
   flashcards_imported_at: string | null;
@@ -128,6 +158,7 @@ function mapDocument(row: StudyDocumentRow): StudyDocument {
     id: row.id,
     courseId: row.course_id,
     originalFilename: row.original_filename,
+    contentKind: row.content_kind,
     analysisStatus: row.analysis_status,
     analysis: asStudyDocumentAnalysis(row.analysis),
     flashcardsImportedAt: row.flashcards_imported_at,
@@ -139,30 +170,41 @@ function mapDocument(row: StudyDocumentRow): StudyDocument {
 async function readAsset(asset: DocumentPickerAsset) {
   if (asset.file) return asset.file;
   const response = await fetch(asset.uri);
-  if (!response.ok) throw new Error('No se pudo abrir el PDF elegido.');
+  if (!response.ok) throw new Error('No se pudo abrir el material elegido.');
   return response.blob();
 }
 
-function createStoragePath(userId: string) {
-  return `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.pdf`;
+function getAssetDescriptor(asset: DocumentPickerAsset) {
+  const extension = asset.name.split('.').pop()?.toLowerCase() ?? '';
+  const fromMime = asset.mimeType ? normalizedMimeTypes[asset.mimeType.toLowerCase()] : undefined;
+  const fromExtension = mimeTypesByExtension[extension];
+  const descriptor = fromMime ?? fromExtension;
+  if (!descriptor || (fromMime && fromExtension && fromMime.kind !== fromExtension.kind)) {
+    throw new Error('Elige un PDF o un audio MP3, WAV, M4A, AAC, OGG, FLAC o WEBM.');
+  }
+  return { ...descriptor, extension: extension || (descriptor.kind === 'pdf' ? 'pdf' : 'audio') };
 }
 
-function friendlyFunctionError(error: unknown) {
-  if (!error || typeof error !== 'object') return 'No se pudo analizar el documento.';
+function createStoragePath(userId: string, extension: string) {
+  return `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
+}
+
+export function friendlyFunctionError(error: unknown, fallback = 'No se pudo completar la solicitud de IA.') {
+  if (!error || typeof error !== 'object') return fallback;
   const candidate = error as { message?: unknown; context?: { json?: () => Promise<unknown> } };
   if (candidate.context?.json) {
     return candidate.context.json()
       .then((body) => typeof body === 'object' && body && 'error' in body && typeof body.error === 'string' ? body.error : '')
       .catch(() => '');
   }
-  return Promise.resolve(typeof candidate.message === 'string' ? candidate.message : 'No se pudo analizar el documento.');
+  return Promise.resolve(typeof candidate.message === 'string' ? candidate.message : fallback);
 }
 
 export async function listStudyDocuments() {
   const client = clientOrThrow();
   const { data, error } = await client
     .from('student_study_documents')
-    .select('id, course_id, original_filename, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
+    .select('id, course_id, original_filename, content_kind, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return ((data ?? []) as StudyDocumentRow[]).map(mapDocument);
@@ -195,15 +237,13 @@ export async function recordAiDocumentConsent() {
 export async function uploadAndAnalyzeStudyDocument({ asset, courseId }: { asset: DocumentPickerAsset; courseId: string }) {
   const client = clientOrThrow();
   const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError || !userData.user) throw new Error('Inicia sesión para analizar un PDF.');
-  if (!asset.name.toLowerCase().endsWith('.pdf') || (asset.mimeType && asset.mimeType !== 'application/pdf')) {
-    throw new Error('Elige un archivo PDF.');
-  }
+  if (userError || !userData.user) throw new Error('Inicia sesión para analizar un material.');
+  const descriptor = getAssetDescriptor(asset);
 
   const file = await readAsset(asset);
-  if (!file.size || file.size > MAX_DOCUMENT_BYTES) throw new Error('El PDF debe pesar como máximo 10 MB.');
+  if (!file.size || file.size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
 
-  const storagePath = createStoragePath(userData.user.id);
+  const storagePath = createStoragePath(userData.user.id, descriptor.extension);
   const { data: document, error: documentError } = await client
     .from('student_study_documents')
     .insert({
@@ -211,7 +251,8 @@ export async function uploadAndAnalyzeStudyDocument({ asset, courseId }: { asset
       course_id: courseId,
       storage_path: storagePath,
       original_filename: asset.name.slice(0, 180),
-      mime_type: 'application/pdf',
+      mime_type: descriptor.mimeType,
+      content_kind: descriptor.kind,
       byte_size: file.size,
     })
     .select('id')
@@ -219,7 +260,7 @@ export async function uploadAndAnalyzeStudyDocument({ asset, courseId }: { asset
   if (documentError || !document) throw new Error(documentError?.message ?? 'No se pudo preparar el documento.');
 
   const { error: uploadError } = await client.storage.from(DOCUMENT_BUCKET).upload(storagePath, file, {
-    contentType: 'application/pdf',
+    contentType: descriptor.mimeType,
     upsert: false,
   });
   if (uploadError) {
@@ -236,8 +277,8 @@ export async function analyzeStudyDocument(documentId: string) {
     body: { documentId },
   });
   if (error) {
-    const message = await friendlyFunctionError(error);
-    throw new Error(message || 'No se pudo analizar el documento.');
+    const message = await friendlyFunctionError(error, 'No se pudo analizar el material.');
+    throw new Error(message || 'No se pudo analizar el material.');
   }
   const analysis = asStudyDocumentAnalysis((data as { analysis?: unknown } | null)?.analysis);
   if (!analysis) throw new Error('La IA no devolvió un análisis utilizable.');

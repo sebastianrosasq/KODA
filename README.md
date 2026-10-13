@@ -15,7 +15,7 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Calendario académico | En crecimiento | 9 periodos 2026 con 34 eventos oficiales de matrícula, clases y evaluaciones. |
 | Repaso | Listo | Flashcards propias por curso y dominio acumulado. |
 | Seguimiento | Listo | Avance por curso, riesgos próximos y recordatorios locales semanales. |
-| IA, PDF y simulacros | Pendiente | Se implementarán mediante Storage privado y Edge Functions, nunca desde claves dentro de la APK. |
+| IA, materiales y simulacros | Listo para configurar | PDFs y audios privados, análisis con Gemini, chat con contexto y simulacros; la clave de Gemini permanece solo en Supabase. |
 
 ## Cómo se conecta todo
 
@@ -26,8 +26,8 @@ flowchart LR
   B --> D[Supabase Auth]
   D --> E[(PostgreSQL + RLS)]
   E --> F[Malla oficial y espacio personal]
-  B -. Sprint 6 .-> G[Storage privado + Edge Function]
-  G -.-> H[IA para PDF y estudio]
+  B --> G[Storage privado + Edge Functions]
+  G --> H[Gemini: materiales y chat]
 ```
 
 La APK solo contiene configuración pública de Supabase. Las reglas RLS hacen que una cuenta no pueda leer ni escribir los datos de otra.
@@ -108,7 +108,7 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 - [Plan S1–S8](docs/SPRINTS.md)
 - [Detalle técnico de Sprints 2 y 3](docs/SPRINT_2_3.md)
 - [Acceso con correo y Google](docs/AUTH_SETUP.md)
-- [Base segura de IA y documentos del Sprint 6](docs/AI_SETUP.md)
+- [Base segura de IA, audios, PDFs y chat](docs/AI_SETUP.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
 
 ## Reglas del equipo

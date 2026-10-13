@@ -9,6 +9,9 @@ const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const isSupabaseConfigured = Boolean(url && publishableKey);
+export const supabasePublicConfig = isSupabaseConfigured
+  ? { url: url!, publishableKey: publishableKey! }
+  : null;
 
 const nativeSecureStorage = {
   getItem: (key: string) => SecureStore.getItemAsync(key),

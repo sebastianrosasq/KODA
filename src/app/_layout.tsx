@@ -7,6 +7,7 @@ import { KodaDataProvider, useKodaData } from '@/providers/koda-data-provider';
 import { KodaThemeProvider, useKodaTheme } from '@/providers/koda-theme-provider';
 import { useStudyReminderNavigation } from '@/features/reminders/study-reminders';
 import { AcademicOnboardingModal } from '@/features/onboarding/academic-onboarding-modal';
+import { KodaAccessGate } from '@/features/auth/koda-access-gate';
 
 export default function RootLayout() {
   return (
@@ -37,6 +38,15 @@ function KodaNavigation() {
       notification: theme.accent,
     },
   };
+
+  if (status !== 'signed_in') {
+    return (
+      <ThemeProvider value={navigationTheme}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <KodaAccessGate isChecking={status === 'checking'} isUnavailable={status === 'unavailable'} />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider value={navigationTheme}>
@@ -104,8 +114,9 @@ function KodaNavigation() {
         />
         <Tabs.Screen name="materials" options={{ href: null }} />
         <Tabs.Screen name="simulations" options={{ href: null }} />
+        <Tabs.Screen name="coach" options={{ href: null }} />
       </Tabs>
-      {hydrated && status === 'signed_in' && !workspace.academicProfileCompleted ? <AcademicOnboardingModal /> : null}
+      {hydrated && !workspace.academicProfileCompleted ? <AcademicOnboardingModal /> : null}
     </ThemeProvider>
   );
 }

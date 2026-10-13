@@ -68,7 +68,7 @@ export default function MaterialsScreen() {
       return;
     }
     if (!hasConsent) {
-      Alert.alert('Confirma el uso de IA', 'Lee y acepta el aviso antes de enviar un PDF para análisis.');
+      Alert.alert('Confirma el uso de IA', 'Lee y acepta el aviso antes de enviar un PDF o audio para análisis.');
       return;
     }
     if (!selectedCourseId) {
@@ -77,7 +77,18 @@ export default function MaterialsScreen() {
     }
 
     const result = await DocumentPicker.getDocumentAsync({
-      type: 'application/pdf',
+      type: [
+        'application/pdf',
+        'audio/mpeg',
+        'audio/mp3',
+        'audio/wav',
+        'audio/aac',
+        'audio/ogg',
+        'audio/flac',
+        'audio/webm',
+        'audio/m4a',
+        'audio/mp4',
+      ],
       copyToCacheDirectory: true,
       multiple: false,
     });
@@ -89,7 +100,7 @@ export default function MaterialsScreen() {
       await loadDocuments();
       Alert.alert('Análisis listo', 'Revisa el resumen, guarda las tarjetas que quieras y practica con el simulacro.');
     } catch (error) {
-      Alert.alert('No se pudo analizar el PDF', error instanceof Error ? error.message : 'Intenta nuevamente más tarde.');
+      Alert.alert('No se pudo analizar el material', error instanceof Error ? error.message : 'Intenta nuevamente más tarde.');
       await loadDocuments();
     } finally {
       setLoading(false);
@@ -119,7 +130,7 @@ export default function MaterialsScreen() {
       await loadDocuments();
       Alert.alert('Análisis listo', 'Ya puedes revisar el resumen, guardar tarjetas o practicar.');
     } catch (error) {
-      Alert.alert('No se pudo analizar el PDF', error instanceof Error ? error.message : 'Intenta nuevamente más tarde.');
+      Alert.alert('No se pudo analizar el material', error instanceof Error ? error.message : 'Intenta nuevamente más tarde.');
       await loadDocuments();
     } finally {
       setRetryingId(null);
@@ -127,7 +138,7 @@ export default function MaterialsScreen() {
   };
 
   const removeDocument = (document: StudyDocument) => {
-    Alert.alert('Eliminar material', 'Se borrará el PDF privado y su análisis. Esta acción no se puede deshacer.', [
+    Alert.alert('Eliminar material', 'Se borrará el PDF o audio privado y su análisis. Esta acción no se puede deshacer.', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
@@ -151,7 +162,7 @@ export default function MaterialsScreen() {
       <KodaPageHeader
         eyebrow="Materiales privados"
         title="Estudia desde tus apuntes"
-        subtitle="KODA convierte un PDF en resumen, tarjetas y práctica. Tú revisas todo antes de usarlo."
+        subtitle="KODA convierte PDFs y audios en resumen, tarjetas y práctica. Tú revisas todo antes de usarlo."
         right={<KodaIconButton icon="chevron-back" label="Volver a repaso" onPress={() => router.back()} />}
       />
 
@@ -165,6 +176,14 @@ export default function MaterialsScreen() {
         </View>
       </KodaCard>
 
+      <KodaCard style={[styles.coachCard, { backgroundColor: theme.accentSoft, borderColor: theme.accentSoft }]}>
+        <View style={styles.coachCopy}>
+          <Text style={[styles.coachTitle, { color: theme.text }]}>¿Tienes una duda puntual?</Text>
+          <Text style={[styles.coachDetail, { color: theme.textSecondary }]}>Conversa con KODA sobre un material ya analizado o recibe una guía breve para repasar.</Text>
+        </View>
+        <KodaButton icon="chatbubble-ellipses-outline" label="Chat IA" onPress={() => router.push('/coach')} variant="secondary" />
+      </KodaCard>
+
       {status !== 'signed_in' ? (
         <KodaCard style={styles.noticeCard}>
           <Text style={[styles.noticeTitle, { color: theme.text }]}>Inicia sesión para usar materiales</Text>
@@ -176,19 +195,19 @@ export default function MaterialsScreen() {
         <KodaCard style={styles.consentCard}>
           <View style={styles.consentCopy}>
             <Text style={[styles.consentTitle, { color: theme.text }]}>Antes de continuar</Text>
-            <Text style={[styles.consentDetail, { color: theme.textSecondary }]}>Acepto que KODA envíe este PDF a Gemini para generar material de estudio. La IA puede equivocarse y debo verificar el resultado.</Text>
+          <Text style={[styles.consentDetail, { color: theme.textSecondary }]}>Acepto que KODA envíe este PDF o audio a Gemini para generar material de estudio. La IA puede equivocarse y debo verificar el resultado.</Text>
           </View>
           <KodaButton disabled={isConsenting} icon="checkmark-circle-outline" label={isConsenting ? 'Guardando…' : 'Acepto y continuar'} onPress={() => void acceptConsent()} />
         </KodaCard>
       ) : null}
 
       <View style={styles.sectionBlock}>
-        <KodaSectionTitle title="Analizar un PDF" />
+        <KodaSectionTitle title="Analizar un PDF o audio" />
         <View style={styles.pills}>
           {courses.map((course) => <KodaPill key={course.id} label={course.name} selected={course.id === selectedCourseId} onPress={() => setCourseId(course.id)} />)}
         </View>
-        <KodaButton disabled={isLoading || !hasConsent || status !== 'signed_in' || !selectedCourseId} icon="document-text-outline" label={isLoading ? 'Analizando tu material…' : 'Elegir PDF de hasta 10 MB'} onPress={() => void chooseAndAnalyze()} />
-        <Text style={[styles.limitText, { color: theme.textTertiary }]}>Límite inicial: 2 análisis de documentos por día. No reemplaza la revisión de tus apuntes.</Text>
+        <KodaButton disabled={isLoading || !hasConsent || status !== 'signed_in' || !selectedCourseId} icon="cloud-upload-outline" label={isLoading ? 'Analizando tu material…' : 'Elegir PDF o audio · hasta 12 MB'} onPress={() => void chooseAndAnalyze()} />
+        <Text style={[styles.limitText, { color: theme.textTertiary }]}>Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Límite inicial: 2 análisis diarios.</Text>
       </View>
 
       <View style={styles.sectionBlock}>
@@ -199,11 +218,11 @@ export default function MaterialsScreen() {
             <KodaCard key={document.id} style={styles.documentCard}>
               <View style={styles.documentHeader}>
                 <View style={[styles.documentIcon, { backgroundColor: document.analysisStatus === 'completed' ? theme.successSoft : theme.warningSoft }]}>
-                  <Ionicons color={document.analysisStatus === 'completed' ? theme.success : theme.warning} name={document.analysisStatus === 'completed' ? 'sparkles-outline' : 'document-text-outline'} size={19} />
+                  <Ionicons color={document.analysisStatus === 'completed' ? theme.success : theme.warning} name={document.analysisStatus === 'completed' ? 'sparkles-outline' : document.contentKind === 'audio' ? 'musical-notes-outline' : 'document-text-outline'} size={19} />
                 </View>
                 <View style={styles.documentCopy}>
                   <Text numberOfLines={1} style={[styles.documentName, { color: theme.text }]}>{document.analysis?.title ?? document.originalFilename}</Text>
-                  <Text style={[styles.documentMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Material de estudio'} · {statusLabel(document.analysisStatus)}</Text>
+                  <Text style={[styles.documentMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Material de estudio'} · {document.contentKind === 'audio' ? 'audio' : 'PDF'} · {statusLabel(document.analysisStatus)}</Text>
                 </View>
                 <KodaIconButton icon="trash-outline" label={'Eliminar ' + document.originalFilename} onPress={() => removeDocument(document)} />
               </View>
@@ -222,6 +241,13 @@ export default function MaterialsScreen() {
                     </View>
                   ) : null}
                   <View style={styles.documentActions}>
+                    <KodaButton
+                      icon="chatbubble-ellipses-outline"
+                      label="Preguntar a KODA"
+                      onPress={() => router.push({ pathname: '/coach', params: { documentId: document.id } })}
+                      style={styles.actionButton}
+                      variant="secondary"
+                    />
                     {document.analysis.flashcards.length ? (
                       <KodaButton
                         disabled={Boolean(document.flashcardsImportedAt) || importingId === document.id}
@@ -259,7 +285,7 @@ export default function MaterialsScreen() {
             <Ionicons color={theme.textTertiary} name="folder-open-outline" size={23} />
             <View style={styles.emptyCopy}>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>Aún no tienes materiales</Text>
-              <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>Sube un PDF propio para convertirlo en un recurso de repaso.</Text>
+              <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>Sube un PDF o audio propio para convertirlo en un recurso de repaso.</Text>
             </View>
           </KodaCard>
         )}
@@ -278,6 +304,10 @@ const styles = StyleSheet.create({
   privacyCopy: { flex: 1, gap: 3 },
   privacyTitle: { fontSize: 14, fontWeight: '900' },
   privacyDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  coachCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  coachCopy: { flex: 1, gap: 3 },
+  coachTitle: { fontSize: 14, fontWeight: '900' },
+  coachDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
   noticeCard: { gap: 4, padding: KodaSpacing.lg },
   noticeTitle: { fontSize: 15, fontWeight: '900' },
   noticeDetail: { fontSize: 13, fontWeight: '600', lineHeight: 19 },

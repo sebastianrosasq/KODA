@@ -22,7 +22,7 @@ Actor primario: **estudiante de educación superior en Perú**. El primer catál
 | CU-10 | Consultar materiales y audio | Accede a resúmenes, enlaces, PDF y audio de repaso. | S4 |
 | CU-11 | Recibir recordatorios | Recibe avisos de exámenes y sesiones configurables. | S5 |
 | CU-12 | Consultar progreso | Ve avance por curso, temas completados y riesgo próximo. | S5 |
-| CU-13 | Analizar un PDF con IA | Extrae estructura para proponer resumen, tarjetas y preguntas. | S6 |
+| CU-13 | Analizar material con IA | Extrae estructura de un PDF o audio para proponer resumen, tarjetas y preguntas. | S6 |
 | CU-14 | Pedir ayuda a la IA | Solicita explicaciones, práctica o recomendaciones con límites. | S6 |
 | CU-15 | Realizar simulacros | Responde preguntas, obtiene resultado y áreas a reforzar. | S7 |
 | CU-16 | Gestionar privacidad y cuenta | Descarga/elimina sus datos y controla el uso de IA. | S8 |

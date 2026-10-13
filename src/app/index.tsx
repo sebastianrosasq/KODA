@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { KodaReveal } from '@/components/koda-reveal';
-import { AccountModal } from '@/features/auth/account-modal';
 import {
   KodaAvatar,
   KodaButton,
@@ -19,14 +17,11 @@ import {
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { getCatalogProgram } from '@/data/academic-catalog';
 import { useKodaData } from '@/providers/koda-data-provider';
-import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function HomeScreen() {
   const { theme } = useKodaTheme();
   const { completeSession, dashboard, plan, workspace } = useKodaData();
-  const { status } = useKodaAuth();
-  const [isAccountModalVisible, setAccountModalVisible] = useState(false);
   const todaySessions = plan.filter((session) => session.day === 'Hoy');
   const nextExam = dashboard.nextExam ?? {
     course: 'Añade tu primer examen',
@@ -64,18 +59,6 @@ export default function HomeScreen() {
           subtitle="Hoy tienes tiempo suficiente para avanzar sin saturarte."
         />
       </KodaReveal>
-
-      {status !== 'signed_in' ? (
-        <KodaReveal delay={68}>
-          <KodaCard style={[styles.accountPrompt, { backgroundColor: theme.accentSoft, borderColor: theme.accentSoft }]}>
-            <View style={styles.accountPromptCopy}>
-              <Text style={[styles.accountPromptTitle, { color: theme.text }]}>Conserva tu avance</Text>
-              <Text style={[styles.accountPromptText, { color: theme.textSecondary }]}>Inicia sesión con Google o correo para sincronizar tu plan.</Text>
-            </View>
-            <KodaButton label="Acceder" onPress={() => setAccountModalVisible(true)} variant="secondary" />
-          </KodaCard>
-        </KodaReveal>
-      ) : null}
 
       <KodaReveal delay={90}>
         <KodaCard style={[styles.examCard, { backgroundColor: theme.accent, borderColor: theme.accent }]}>
@@ -117,6 +100,19 @@ export default function HomeScreen() {
           </View>
         </KodaCard>
       </KodaReveal>
+
+      <View style={styles.sectionBlock}>
+        <KodaCard style={[styles.coachCard, { backgroundColor: theme.surfaceMuted }]}>
+          <View style={[styles.coachIcon, { backgroundColor: theme.accentSoft }]}>
+            <Ionicons color={theme.accent} name="sparkles-outline" size={21} />
+          </View>
+          <View style={styles.coachCopy}>
+            <Text style={[styles.coachTitle, { color: theme.text }]}>Repasa con KODA IA</Text>
+            <Text style={[styles.coachText, { color: theme.textSecondary }]}>Carga un PDF o audio y pregunta sobre tu material de estudio.</Text>
+          </View>
+          <KodaButton label="Abrir" onPress={() => router.push('/coach')} variant="secondary" />
+        </KodaCard>
+      </View>
 
       <View style={styles.sectionBlock}>
         <KodaSectionTitle title="Tu día de hoy" action="Ver plan" onActionPress={() => router.push('/plan')} />
@@ -190,7 +186,6 @@ export default function HomeScreen() {
           </KodaText>
         </View>
       </View>
-      {isAccountModalVisible ? <AccountModal onClose={() => setAccountModalVisible(false)} /> : null}
     </KodaScreen>
   );
 }
@@ -212,10 +207,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1.8,
   },
-  accountPrompt: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
-  accountPromptCopy: { flex: 1, gap: 2 },
-  accountPromptTitle: { fontSize: 14, fontWeight: '900' },
-  accountPromptText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  coachCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  coachIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },
+  coachCopy: { flex: 1, gap: 2 },
+  coachTitle: { fontSize: 14, fontWeight: '900' },
+  coachText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   examCard: {
     gap: KodaSpacing.xl,
     overflow: 'hidden',

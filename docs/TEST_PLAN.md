@@ -16,9 +16,12 @@ Las pruebas automatizadas verifican reglas deterministas. La validación de inte
 | Flujo | Verificación |
 | --- | --- |
 | Consentimiento IA | Sin aceptar, el selector no analiza; al aceptar se conserva la fecha en el perfil. |
-| Privacidad | Una cuenta B no lista, descarga ni elimina PDFs o resultados de una cuenta A. |
+| Acceso | Una visita sin sesión muestra solo el registro/inicio; después de acceder aparece el registro académico y luego KODA. |
+| Google | Si Google está desactivado, se muestra un aviso en KODA y no una página JSON. Después de configurarlo según `AUTH_SETUP.md`, el retorno crea una sesión. |
+| Privacidad | Una cuenta B no lista, descarga ni elimina PDFs, audios o resultados de una cuenta A. |
 | Cuota | El tercer análisis del mismo usuario y día devuelve un mensaje claro; no envía el archivo a Gemini. |
-| PDF | Se rechazan archivos que no sean PDF o excedan 10 MB; un PDF válido genera resumen, tarjetas y preguntas. |
+| Material | Se rechazan archivos que no sean PDF/audio compatible o excedan 12 MB; un material válido genera resumen, tarjetas y preguntas. |
+| Chat IA | Requiere consentimiento; puede usar el análisis de un material seleccionado, no guarda mensajes y respeta el límite de 8 mensajes diarios. |
 | Simulacro | No permite finalizar con preguntas sin responder; muestra corrección y explicación al final. |
 | Accesibilidad | Botones, opciones y barra de avance tienen etiqueta/estado accesible; revisar lector de pantalla y modo oscuro en Android. |
 | Error de red | La pantalla no pierde el documento ni presenta un resultado inventado. |

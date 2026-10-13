@@ -2,7 +2,17 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const DOCUMENT_BUCKET = 'koda-study-documents';
-const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+const MAX_STUDY_MATERIAL_BYTES = 12 * 1024 * 1024;
+const supportedMimeTypes = new Set([
+  'application/pdf',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/aac',
+  'audio/ogg',
+  'audio/flac',
+  'audio/webm',
+  'audio/m4a',
+]);
 const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -46,6 +56,8 @@ const studySchema = {
 type StudyDocument = {
   id: string;
   storage_path: string;
+  mime_type: string;
+  content_kind: 'pdf' | 'audio';
   analysis_status: string;
   analysis: unknown;
 };
@@ -189,7 +201,7 @@ Deno.serve(async (request) => {
 
   const { data, error: documentError } = await client
     .from('student_study_documents')
-    .select('id, storage_path, analysis_status, analysis')
+    .select('id, storage_path, mime_type, content_kind, analysis_status, analysis')
     .eq('id', documentId)
     .maybeSingle();
   const document = data as StudyDocument | null;
@@ -201,13 +213,13 @@ Deno.serve(async (request) => {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) return json({ error: 'La IA aún no está configurada para este entorno.' }, 503);
 
-  const { data: pdf, error: downloadError } = await client.storage.from(DOCUMENT_BUCKET).download(document.storage_path);
-  if (downloadError || !pdf || pdf.type !== 'application/pdf' || pdf.size > MAX_DOCUMENT_BYTES) {
+  const { data: material, error: downloadError } = await client.storage.from(DOCUMENT_BUCKET).download(document.storage_path);
+  if (downloadError || !material || !supportedMimeTypes.has(document.mime_type) || material.size > MAX_STUDY_MATERIAL_BYTES) {
     await markDocument(adminClient, document.id, {
       analysis_status: 'failed',
-      last_error: 'El PDF no pudo leerse o supera los 10 MB.',
+      last_error: 'El material no pudo leerse, tiene un formato no permitido o supera los 12 MB.',
     });
-    return json({ error: 'Solo se aceptan PDF legibles de hasta 10 MB.' }, 400);
+    return json({ error: 'Solo se aceptan PDF o audios compatibles de hasta 12 MB.' }, 400);
   }
 
   const { data: quotaData, error: quotaError } = await adminClient.rpc('consume_koda_ai_quota', {
@@ -233,10 +245,12 @@ Deno.serve(async (request) => {
         contents: [{
           role: 'user',
           parts: [
-            { inlineData: { mimeType: 'application/pdf', data: toBase64(new Uint8Array(await pdf.arrayBuffer())) } },
+            { inlineData: { mimeType: document.mime_type, data: toBase64(new Uint8Array(await material.arrayBuffer())) } },
             {
               text: [
-                'Analiza exclusivamente este material para una semana de exámenes.',
+                document.content_kind === 'audio'
+                  ? 'Analiza exclusivamente este audio de estudio para una semana de exámenes. Identifica con cautela las ideas expresadas; si una parte no es audible, no la inventes.'
+                  : 'Analiza exclusivamente este PDF para una semana de exámenes.',
                 'No inventes información ni uses fuentes externas.',
                 'Escribe en español claro. Resume las ideas verificables, crea de 3 a 8 flashcards útiles y 3 a 5 preguntas de opción múltiple.',
                 'Cada pregunta debe tener exactamente cuatro opciones, un índice correctOption de 0 a 3 y una explicación breve.',
