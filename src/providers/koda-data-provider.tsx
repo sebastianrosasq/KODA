@@ -33,41 +33,43 @@ const defaultWorkspace: KodaWorkspace = {
     currentTerm: 4,
   },
   courses: [
-    { id: 'architecture', name: 'Arquitectura de Software', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'plum' },
-    { id: 'database', name: 'Base de Datos', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'mint' },
-    { id: 'web', name: 'Desarrollo web', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'amber' },
-    { id: 'english', name: 'Inglés técnico', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'sky' },
+    { id: 'software-testing', name: 'Construcción y Pruebas de Software', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'plum' },
+    { id: 'emerging-tech', name: 'Tecnologías Emergentes', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'mint' },
+    { id: 'enterprise-apps', name: 'Desarrollo de Aplicaciones Empresariales', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'amber' },
+    { id: 'web-apps', name: 'Desarrollo de Aplicaciones Web', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'sky' },
+    { id: 'mobile-programming', name: 'Programación en Móviles', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'plum' },
+    { id: 'innovation-research', name: 'Investigación e Innovación Tecnológica', termNumber: 4, isActive: true, wasPreloaded: true, tone: 'mint' },
   ],
   exams: [
-    { id: 'exam-architecture', courseId: 'architecture', title: 'Examen parcial', dateIso: dateInDays(3), difficulty: 3 },
-    { id: 'exam-database', courseId: 'database', title: 'Práctica calificada', dateIso: dateInDays(5), difficulty: 2 },
+    { id: 'exam-software-testing', courseId: 'software-testing', title: 'Examen parcial', dateIso: dateInDays(3), difficulty: 3 },
+    { id: 'exam-web-apps', courseId: 'web-apps', title: 'Práctica calificada', dateIso: dateInDays(5), difficulty: 2 },
   ],
   topics: [
-    { id: 'architecture-patterns', courseId: 'architecture', name: 'Patrones y atributos de calidad', priority: 3, completed: false },
-    { id: 'architecture-integration', courseId: 'architecture', name: 'Patrones de integración', priority: 2, completed: false },
-    { id: 'database-normalization', courseId: 'database', name: 'Normalización y dependencias', priority: 3, completed: false },
-    { id: 'database-sql', courseId: 'database', name: 'Consultas SQL', priority: 2, completed: false },
-    { id: 'web-rest', courseId: 'web', name: 'Diseño de endpoints REST', priority: 2, completed: false },
-    { id: 'english-vocabulary', courseId: 'english', name: 'Vocabulario técnico', priority: 1, completed: false },
+    { id: 'software-testing-unit', courseId: 'software-testing', name: 'Pruebas unitarias y criterios de aceptación', priority: 3, completed: false },
+    { id: 'software-testing-agile', courseId: 'software-testing', name: 'Flujo ágil y aseguramiento de calidad', priority: 2, completed: false },
+    { id: 'emerging-tech-trends', courseId: 'emerging-tech', name: 'Tendencias y casos de aplicación', priority: 2, completed: false },
+    { id: 'enterprise-apps-layers', courseId: 'enterprise-apps', name: 'Arquitectura por capas y persistencia', priority: 3, completed: false },
+    { id: 'web-apps-rest', courseId: 'web-apps', name: 'Diseño de endpoints REST', priority: 2, completed: false },
+    { id: 'mobile-programming-ui', courseId: 'mobile-programming', name: 'Interfaz y ciclo de vida móvil', priority: 1, completed: false },
   ],
   flashcards: [
     {
       id: 'flashcard-quality',
-      courseId: 'architecture',
+      courseId: 'software-testing',
       prompt: '¿Qué atributo de calidad mide la facilidad para modificar un sistema?',
       answer: 'La modificabilidad: el esfuerzo necesario para cambiar, corregir o ampliar un sistema.',
       mastery: 1,
     },
     {
-      id: 'flashcard-normalization',
-      courseId: 'database',
-      prompt: '¿Cuál es el objetivo de la normalización de una base de datos?',
-      answer: 'Reducir redundancia y dependencias anómalas sin perder información importante.',
+      id: 'flashcard-acceptance',
+      courseId: 'software-testing',
+      prompt: '¿Qué debe describir un criterio de aceptación?',
+      answer: 'Un resultado observable que permita decidir si una historia de usuario cumple lo esperado.',
       mastery: 0,
     },
     {
       id: 'flashcard-rest',
-      courseId: 'web',
+      courseId: 'web-apps',
       prompt: '¿Qué comunica un endpoint REST bien diseñado?',
       answer: 'Un recurso y una acción coherente mediante su ruta, método HTTP y respuesta.',
       mastery: 0,
@@ -84,7 +86,7 @@ const defaultWorkspace: KodaWorkspace = {
 };
 
 function normalizeWorkspace(candidate: Partial<KodaWorkspace>): KodaWorkspace {
-  return {
+  const normalized = {
     ...defaultWorkspace,
     ...candidate,
     profile: candidate.profile ?? defaultWorkspace.profile,
@@ -94,6 +96,22 @@ function normalizeWorkspace(candidate: Partial<KodaWorkspace>): KodaWorkspace {
     flashcards: candidate.flashcards ?? [],
     availability: candidate.availability ?? defaultWorkspace.availability,
     completedSessionIds: candidate.completedSessionIds ?? defaultWorkspace.completedSessionIds,
+  };
+
+  // Corrige solamente la maqueta inicial antigua de TECSUP. No modifica
+  // cursos agregados por la persona usuaria ni perfiles de otra institución.
+  const legacyTecsUpIds = new Set(['architecture', 'database', 'web', 'english']);
+  const isOnlyLegacyTecsUpDemo = normalized.profile.institutionSlug === 'tecsup'
+    && normalized.profile.programSlug === 'diseno-desarrollo-software'
+    && normalized.courses.length > 0
+    && normalized.courses.every((course) => course.wasPreloaded && legacyTecsUpIds.has(course.id));
+  if (!isOnlyLegacyTecsUpDemo) return normalized;
+
+  return {
+    ...defaultWorkspace,
+    profile: normalized.profile,
+    availability: normalized.availability,
+    completedSessionIds: normalized.completedSessionIds,
   };
 }
 
@@ -209,11 +227,10 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     void loadWorkspaceFromSupabase(userId, workspaceRef.current)
       .then(async (remoteWorkspace) => {
         if (!active) return;
-        if (remoteWorkspace) {
-          setCurrentWorkspace(remoteWorkspace);
-        }
+        const currentWorkspace = remoteWorkspace ? normalizeWorkspace(remoteWorkspace) : workspaceRef.current;
+        if (remoteWorkspace) setCurrentWorkspace(currentWorkspace);
         syncedUserIdRef.current = userId;
-        await syncWorkspaceToSupabase(userId, remoteWorkspace ?? workspaceRef.current);
+        await syncWorkspaceToSupabase(userId, currentWorkspace);
         if (active) setSyncState('synced');
       })
       .catch((error: unknown) => {

@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { catalogInstitutions, getCatalogProgram, getProgramsForInstitution, getSuggestedCourses } from '@/data/academic-catalog';
 import { KodaReveal } from '@/components/koda-reveal';
+import { AccountModal } from '@/features/auth/account-modal';
 import {
   KodaAvatar,
   KodaButton,
@@ -25,7 +26,7 @@ import { useKodaTheme } from '@/providers/koda-theme-provider';
 export default function ProfileScreen() {
   const { colorScheme, theme, toggleColorScheme } = useKodaTheme();
   const { workspace, addCourse, removeCourse, setCourseActive, syncError, syncState } = useKodaData();
-  const { isConfigured, session, status, signIn, signOut, signUp } = useKodaAuth();
+  const { isConfigured, session, status, signOut } = useKodaAuth();
   const [isAcademicModalVisible, setAcademicModalVisible] = useState(false);
   const [isAccountModalVisible, setAccountModalVisible] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
@@ -186,14 +187,7 @@ export default function ProfileScreen() {
       </KodaReveal>
 
       {isAcademicModalVisible ? <AcademicProfileModal onClose={() => setAcademicModalVisible(false)} /> : null}
-      {isAccountModalVisible ? (
-        <AccountModal
-          isConfigured={isConfigured}
-          onClose={() => setAccountModalVisible(false)}
-          onSignIn={signIn}
-          onSignUp={signUp}
-        />
-      ) : null}
+      {isAccountModalVisible ? <AccountModal onClose={() => setAccountModalVisible(false)} /> : null}
     </KodaScreen>
   );
 }
@@ -272,83 +266,6 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
             </View>
             <KodaButton disabled={isSaving} label={isSaving ? 'Consultando malla…' : 'Guardar y sugerir cursos'} icon="sparkles-outline" onPress={() => void saveProfile()} />
           </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-function AccountModal({
-  isConfigured,
-  onClose,
-  onSignIn,
-  onSignUp,
-}: {
-  isConfigured: boolean;
-  onClose: () => void;
-  onSignIn: (email: string, password: string) => Promise<string | null>;
-  onSignUp: (email: string, password: string) => Promise<string | null>;
-}) {
-  const { theme } = useKodaTheme();
-  const reducedMotion = useReducedMotion();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (mode: 'signIn' | 'signUp') => {
-    setLoading(true);
-    const result = mode === 'signIn' ? await onSignIn(email, password) : await onSignUp(email, password);
-    setLoading(false);
-    setMessage(result ?? (mode === 'signIn' ? 'Sesión iniciada.' : 'Cuenta creada.'));
-  };
-
-  return (
-    <Modal animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={onClose} transparent visible>
-      <Pressable accessibilityLabel="Cerrar acceso a cuenta" onPress={onClose} style={[styles.modalOverlay, { backgroundColor: theme.overlay + '99' }]}>
-        <Pressable onPress={() => undefined} style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderCopy}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Tu cuenta KODA</Text>
-              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>Sincroniza solo cuando el servidor seguro esté disponible.</Text>
-            </View>
-            <KodaIconButton icon="close" label="Cerrar" onPress={onClose} />
-          </View>
-          {!isConfigured ? (
-            <View style={[styles.catalogNotice, { backgroundColor: theme.accentSoft }]}>
-              <Ionicons color={theme.accent} name="cloud-offline-outline" size={19} />
-              <Text style={[styles.catalogNoticeText, { color: theme.textSecondary }]}>Supabase aún no está vinculado. Tus datos siguen disponibles localmente en este dispositivo.</Text>
-            </View>
-          ) : (
-            <>
-              <TextInput
-                accessibilityLabel="Correo electrónico"
-                autoCapitalize="none"
-                autoComplete="email"
-                autoCorrect={false}
-                keyboardType="email-address"
-                onChangeText={setEmail}
-                placeholder="correo@ejemplo.com"
-                placeholderTextColor={theme.textTertiary}
-                style={[styles.authInput, { borderColor: theme.border, color: theme.text }]}
-                value={email}
-              />
-              <TextInput
-                accessibilityLabel="Contraseña"
-                autoCapitalize="none"
-                onChangeText={setPassword}
-                placeholder="Contraseña"
-                placeholderTextColor={theme.textTertiary}
-                secureTextEntry
-                style={[styles.authInput, { borderColor: theme.border, color: theme.text }]}
-                value={password}
-              />
-              {message ? <Text style={[styles.accountMessage, { color: theme.textSecondary }]}>{message}</Text> : null}
-              {loading ? <ActivityIndicator color={theme.accent} /> : null}
-              <KodaButton label="Iniciar sesión" disabled={loading} onPress={() => void submit('signIn')} />
-              <KodaButton label="Crear cuenta" disabled={loading} onPress={() => void submit('signUp')} variant="secondary" />
-            </>
-          )}
         </Pressable>
       </Pressable>
     </Modal>

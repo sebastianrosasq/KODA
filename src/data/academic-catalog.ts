@@ -58,7 +58,7 @@ export const catalogPrograms: CatalogProgram[] = [
 
 const offlineSuggestions: Record<string, Record<number, string[]>> = {
   'tecsup/diseno-desarrollo-software': {
-    4: ['Construcción y Pruebas de Software', 'Tecnologías Emergentes', 'Desarrollo de Aplicaciones Empresariales', 'Desarrollo de Aplicaciones Web'],
+    4: ['Construcción y Pruebas de Software', 'Tecnologías Emergentes', 'Desarrollo de Aplicaciones Empresariales', 'Desarrollo de Aplicaciones Web', 'Programación en Móviles', 'Investigación e Innovación Tecnológica'],
   },
   'utp/ingenieria-sistemas-informatica': {
     4: ['Programación Orientada a Objetos', 'Base de Datos', 'Análisis y Diseño de Algoritmos', 'Cálculo 2'],

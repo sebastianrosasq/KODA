@@ -34,10 +34,17 @@
       [
         "expo-notifications",
         {
-          "color": "#6D5FA8",
+          "color": "#6D4AFF",
           "defaultChannel": "study-reminders"
         }
-      ]
+      ],
+      [
+        "expo-web-browser",
+        {
+          "experimentalLauncherActivity": false
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,8 +1,11 @@
 import { type Session } from '@supabase/supabase-js';
+import * as WebBrowser from 'expo-web-browser';
 import { AppState, Platform } from 'react-native';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type AuthStatus = 'checking' | 'signed_out' | 'signed_in' | 'unavailable';
 
@@ -12,6 +15,7 @@ type KodaAuthContextValue = {
   isConfigured: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<string | null>;
+  signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
 };
 
@@ -68,13 +72,53 @@ export function KodaAuthProvider({ children }: { children: ReactNode }) {
     return data.session ? null : 'Revisa tu correo para confirmar la cuenta antes de iniciar sesión.';
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    if (!supabase) return 'Conecta el proyecto Supabase para habilitar el acceso.';
+
+    if (Platform.OS === 'web') {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      return error?.message ?? null;
+    }
+
+    const redirectTo = 'koda://google-auth';
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        queryParams: { prompt: 'consent' },
+        skipBrowserRedirect: true,
+      },
+    });
+    if (error) return error.message;
+    if (!data.url) return 'No se pudo iniciar el acceso con Google.';
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, { showInRecents: true });
+    if (result.type !== 'success') {
+      return result.type === 'cancel' ? 'El acceso con Google fue cancelado.' : 'No se pudo completar el acceso con Google.';
+    }
+
+    const params = new URLSearchParams(new URL(result.url).hash.slice(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (!accessToken || !refreshToken) return 'Google no devolvió una sesión válida.';
+
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    return sessionError?.message ?? null;
+  }, []);
+
   const signOut = useCallback(async () => {
     if (supabase) await supabase.auth.signOut();
   }, []);
 
   const value = useMemo(
-    () => ({ status, session, isConfigured: isSupabaseConfigured, signIn, signUp, signOut }),
-    [session, signIn, signOut, signUp, status],
+    () => ({ status, session, isConfigured: isSupabaseConfigured, signIn, signUp, signInWithGoogle, signOut }),
+    [session, signIn, signInWithGoogle, signOut, signUp, status],
   );
 
   return <KodaAuthContext.Provider value={value}>{children}</KodaAuthContext.Provider>;

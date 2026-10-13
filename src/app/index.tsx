@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { KodaReveal } from '@/components/koda-reveal';
+import { AccountModal } from '@/features/auth/account-modal';
 import {
   KodaAvatar,
   KodaButton,
@@ -17,11 +19,14 @@ import {
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { getCatalogProgram } from '@/data/academic-catalog';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function HomeScreen() {
   const { theme } = useKodaTheme();
   const { completeSession, dashboard, plan, workspace } = useKodaData();
+  const { status } = useKodaAuth();
+  const [isAccountModalVisible, setAccountModalVisible] = useState(false);
   const todaySessions = plan.filter((session) => session.day === 'Hoy');
   const nextExam = dashboard.nextExam ?? {
     course: 'Añade tu primer examen',
@@ -45,9 +50,7 @@ export default function HomeScreen() {
       <KodaReveal>
         <View style={styles.topBar}>
           <View style={styles.brandLockup}>
-            <View style={[styles.brandMark, { backgroundColor: theme.accent }]}>
-              <Text style={[styles.brandLetter, { color: theme.onAccent }]}>K</Text>
-            </View>
+            <Image accessibilityLabel="Logotipo de KODA" source={require('@/assets/images/koda-mark.png')} style={styles.brandMark} />
             <Text style={[styles.brandName, { color: theme.text }]}>KODA</Text>
           </View>
           <KodaIconButton icon="person-outline" label="Abrir perfil" onPress={() => router.push('/profile')} />
@@ -61,6 +64,18 @@ export default function HomeScreen() {
           subtitle="Hoy tienes tiempo suficiente para avanzar sin saturarte."
         />
       </KodaReveal>
+
+      {status !== 'signed_in' ? (
+        <KodaReveal delay={68}>
+          <KodaCard style={[styles.accountPrompt, { backgroundColor: theme.accentSoft, borderColor: theme.accentSoft }]}>
+            <View style={styles.accountPromptCopy}>
+              <Text style={[styles.accountPromptTitle, { color: theme.text }]}>Conserva tu avance</Text>
+              <Text style={[styles.accountPromptText, { color: theme.textSecondary }]}>Inicia sesión con Google o correo para sincronizar tu plan.</Text>
+            </View>
+            <KodaButton label="Acceder" onPress={() => setAccountModalVisible(true)} variant="secondary" />
+          </KodaCard>
+        </KodaReveal>
+      ) : null}
 
       <KodaReveal delay={90}>
         <KodaCard style={[styles.examCard, { backgroundColor: theme.accent, borderColor: theme.accent }]}>
@@ -175,6 +190,7 @@ export default function HomeScreen() {
           </KodaText>
         </View>
       </View>
+      {isAccountModalVisible ? <AccountModal onClose={() => setAccountModalVisible(false)} /> : null}
     </KodaScreen>
   );
 }
@@ -190,23 +206,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: KodaSpacing.sm,
   },
-  brandMark: {
-    alignItems: 'center',
-    borderRadius: 10,
-    height: 30,
-    justifyContent: 'center',
-    width: 30,
-  },
-  brandLetter: {
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: -0.5,
-  },
+  brandMark: { height: 32, width: 32 },
   brandName: {
     fontSize: 15,
     fontWeight: '900',
     letterSpacing: 1.8,
   },
+  accountPrompt: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  accountPromptCopy: { flex: 1, gap: 2 },
+  accountPromptTitle: { fontSize: 14, fontWeight: '900' },
+  accountPromptText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   examCard: {
     gap: KodaSpacing.xl,
     overflow: 'hidden',

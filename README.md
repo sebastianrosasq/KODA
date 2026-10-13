@@ -9,7 +9,7 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Área | Estado | Qué incluye hoy |
 | --- | --- | --- |
 | Fundación y diseño | Listo | Expo Router, TypeScript, diseño claro/oscuro y componentes reutilizables. |
-| Cuenta y datos | Listo | Supabase Auth, PostgreSQL, RLS y sincronización por estudiante. |
+| Cuenta y datos | En configuración | Correo, sesión segura, RLS y sincronización; Google requiere registrar el proveedor externo. |
 | Organización | Listo | Cursos, exámenes, temas, disponibilidad y un plan explicable. |
 | Catálogo curricular | En crecimiento | 15 instituciones, 16 carreras, 7 planes verificados y 380 cursos. |
 | Repaso | Listo | Flashcards propias por curso y dominio acumulado. |
@@ -100,10 +100,12 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 
 - [Guía de instalación y primer arranque](docs/GETTING_STARTED.md)
 - [Cómo colaborar: ramas, revisiones y commits](CONTRIBUTING.md)
+- [Acceso con correo y Google](docs/AUTH_SETUP.md)
 - [Alcance y 16 casos de uso](docs/PRODUCT_SCOPE.md)
 - [Arquitectura, límites de seguridad y recorrido de IA](docs/SYSTEM_ARCHITECTURE.md)
 - [Plan S1–S8](docs/SPRINTS.md)
 - [Detalle técnico de Sprints 2 y 3](docs/SPRINT_2_3.md)
+- [Acceso con correo y Google](docs/AUTH_SETUP.md)
 - [Base segura de IA y documentos del Sprint 6](docs/AI_SETUP.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
 
