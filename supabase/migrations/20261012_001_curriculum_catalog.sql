@@ -113,16 +113,28 @@ create table public.student_courses (
 
 create index curriculum_programs_institution_idx
   on public.curriculum_programs (institution_id);
+create index curriculum_programs_source_idx
+  on public.curriculum_programs (source_id);
 create index curriculum_plans_program_idx
   on public.curriculum_plans (program_id);
+create index curriculum_plans_source_idx
+  on public.curriculum_plans (source_id);
 create index curriculum_terms_plan_idx
   on public.curriculum_terms (plan_id, term_number);
 create index curriculum_courses_term_idx
   on public.curriculum_courses (term_id, position);
 create index student_curriculum_profiles_user_idx
   on public.student_curriculum_profiles (user_id);
+create index student_curriculum_profiles_institution_idx
+  on public.student_curriculum_profiles (institution_id);
+create index student_curriculum_profiles_program_idx
+  on public.student_curriculum_profiles (program_id);
+create index student_curriculum_profiles_plan_idx
+  on public.student_curriculum_profiles (plan_id);
 create index student_courses_profile_idx
   on public.student_courses (profile_id);
+create index student_courses_curriculum_course_idx
+  on public.student_courses (curriculum_course_id);
 
 alter table public.curriculum_institutions enable row level security;
 alter table public.curriculum_sources enable row level security;
@@ -147,55 +159,59 @@ create policy "Public catalog courses are readable"
   on public.curriculum_courses for select using (true);
 
 create policy "Students read their curriculum profile"
-  on public.student_curriculum_profiles for select using (auth.uid() = user_id);
+  on public.student_curriculum_profiles for select to authenticated
+  using ((select auth.uid()) = user_id);
 create policy "Students create their curriculum profile"
-  on public.student_curriculum_profiles for insert with check (auth.uid() = user_id);
+  on public.student_curriculum_profiles for insert to authenticated
+  with check ((select auth.uid()) = user_id);
 create policy "Students update their curriculum profile"
-  on public.student_curriculum_profiles for update using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  on public.student_curriculum_profiles for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 create policy "Students delete their curriculum profile"
-  on public.student_curriculum_profiles for delete using (auth.uid() = user_id);
+  on public.student_curriculum_profiles for delete to authenticated
+  using ((select auth.uid()) = user_id);
 
 create policy "Students read their courses"
-  on public.student_courses for select using (
+  on public.student_courses for select to authenticated using (
     exists (
       select 1
       from public.student_curriculum_profiles profile
       where profile.id = student_courses.profile_id
-        and profile.user_id = auth.uid()
+        and profile.user_id = (select auth.uid())
     )
   );
 create policy "Students create their courses"
-  on public.student_courses for insert with check (
+  on public.student_courses for insert to authenticated with check (
     exists (
       select 1
       from public.student_curriculum_profiles profile
       where profile.id = student_courses.profile_id
-        and profile.user_id = auth.uid()
+        and profile.user_id = (select auth.uid())
     )
   );
 create policy "Students update their courses"
-  on public.student_courses for update using (
+  on public.student_courses for update to authenticated using (
     exists (
       select 1
       from public.student_curriculum_profiles profile
       where profile.id = student_courses.profile_id
-        and profile.user_id = auth.uid()
+        and profile.user_id = (select auth.uid())
     )
   ) with check (
     exists (
       select 1
       from public.student_curriculum_profiles profile
       where profile.id = student_courses.profile_id
-        and profile.user_id = auth.uid()
+        and profile.user_id = (select auth.uid())
     )
   );
 create policy "Students delete their courses"
-  on public.student_courses for delete using (
+  on public.student_courses for delete to authenticated using (
     exists (
       select 1
       from public.student_curriculum_profiles profile
       where profile.id = student_courses.profile_id
-        and profile.user_id = auth.uid()
+        and profile.user_id = (select auth.uid())
     )
   );

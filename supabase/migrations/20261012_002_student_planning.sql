@@ -62,6 +62,8 @@ create index student_exams_course_schedule_idx on public.student_exams (course_i
 create index student_topics_course_idx on public.student_topics (course_id);
 create index student_availability_profile_idx on public.student_availability_blocks (profile_id, weekday);
 create index student_study_sessions_course_schedule_idx on public.student_study_sessions (course_id, starts_at);
+create index student_study_sessions_exam_idx on public.student_study_sessions (exam_id);
+create index student_study_sessions_topic_idx on public.student_study_sessions (topic_id);
 
 alter table public.student_profiles enable row level security;
 alter table public.student_exams enable row level security;
@@ -70,18 +72,18 @@ alter table public.student_availability_blocks enable row level security;
 alter table public.student_study_sessions enable row level security;
 
 create policy "Students manage their account profile"
-  on public.student_profiles for all
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
+  on public.student_profiles for all to authenticated
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
 
 create policy "Students manage their exams"
-  on public.student_exams for all
+  on public.student_exams for all to authenticated
   using (
     exists (
       select 1
       from public.student_courses course
       join public.student_curriculum_profiles profile on profile.id = course.profile_id
-      where course.id = student_exams.course_id and profile.user_id = auth.uid()
+      where course.id = student_exams.course_id and profile.user_id = (select auth.uid())
     )
   )
   with check (
@@ -89,18 +91,18 @@ create policy "Students manage their exams"
       select 1
       from public.student_courses course
       join public.student_curriculum_profiles profile on profile.id = course.profile_id
-      where course.id = student_exams.course_id and profile.user_id = auth.uid()
+      where course.id = student_exams.course_id and profile.user_id = (select auth.uid())
     )
   );
 
 create policy "Students manage their topics"
-  on public.student_topics for all
+  on public.student_topics for all to authenticated
   using (
     exists (
       select 1
       from public.student_courses course
       join public.student_curriculum_profiles profile on profile.id = course.profile_id
-      where course.id = student_topics.course_id and profile.user_id = auth.uid()
+      where course.id = student_topics.course_id and profile.user_id = (select auth.uid())
     )
   )
   with check (
@@ -108,35 +110,35 @@ create policy "Students manage their topics"
       select 1
       from public.student_courses course
       join public.student_curriculum_profiles profile on profile.id = course.profile_id
-      where course.id = student_topics.course_id and profile.user_id = auth.uid()
+      where course.id = student_topics.course_id and profile.user_id = (select auth.uid())
     )
   );
 
 create policy "Students manage their availability"
-  on public.student_availability_blocks for all
+  on public.student_availability_blocks for all to authenticated
   using (
     exists (
       select 1
       from public.student_curriculum_profiles profile
-      where profile.id = student_availability_blocks.profile_id and profile.user_id = auth.uid()
+      where profile.id = student_availability_blocks.profile_id and profile.user_id = (select auth.uid())
     )
   )
   with check (
     exists (
       select 1
       from public.student_curriculum_profiles profile
-      where profile.id = student_availability_blocks.profile_id and profile.user_id = auth.uid()
+      where profile.id = student_availability_blocks.profile_id and profile.user_id = (select auth.uid())
     )
   );
 
 create policy "Students manage their study sessions"
-  on public.student_study_sessions for all
+  on public.student_study_sessions for all to authenticated
   using (
     exists (
       select 1
       from public.student_courses course
       join public.student_curriculum_profiles profile on profile.id = course.profile_id
-      where course.id = student_study_sessions.course_id and profile.user_id = auth.uid()
+      where course.id = student_study_sessions.course_id and profile.user_id = (select auth.uid())
     )
   )
   with check (
@@ -144,6 +146,6 @@ create policy "Students manage their study sessions"
       select 1
       from public.student_courses course
       join public.student_curriculum_profiles profile on profile.id = course.profile_id
-      where course.id = student_study_sessions.course_id and profile.user_id = auth.uid()
+      where course.id = student_study_sessions.course_id and profile.user_id = (select auth.uid())
     )
   );
