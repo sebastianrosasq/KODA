@@ -37,6 +37,9 @@ yarn-error.*
 google-services.json
 service-account*.json
 
+# Supabase local runtime cache
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 
