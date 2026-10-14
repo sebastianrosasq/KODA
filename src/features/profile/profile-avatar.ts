@@ -1,5 +1,4 @@
 import type { ImagePickerAsset } from 'expo-image-picker';
-import { File } from 'expo-file-system';
 
 import { supabase } from '@/lib/supabase';
 
@@ -38,8 +37,13 @@ function getDescriptor(asset: ImagePickerAsset) {
   return result;
 }
 
-function exactArrayBuffer(bytes: Uint8Array) {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+async function readAvatar(asset: ImagePickerAsset) {
+  if (!asset.uri) throw new Error('No pudimos leer la foto seleccionada. Inténtalo nuevamente.');
+  const response = await fetch(asset.uri);
+  if (!response.ok) throw new Error('No pudimos abrir la foto seleccionada. Inténtalo nuevamente.');
+  const body = await response.arrayBuffer();
+  if (!body.byteLength) throw new Error('La foto está vacía o no pudo leerse.');
+  return { body, size: body.byteLength };
 }
 
 export async function getProfileAvatarUrl(path: string | null | undefined) {
@@ -57,14 +61,11 @@ export async function uploadProfileAvatar(asset: ImagePickerAsset) {
   if (userError || !userData.user) throw new Error('Inicia sesión para cambiar tu foto de perfil.');
 
   const descriptor = getDescriptor(asset);
-  const file = new File(asset.uri);
-  if (!file.size || file.size > MAX_AVATAR_BYTES) {
+  if (asset.fileSize && asset.fileSize > MAX_AVATAR_BYTES) {
     throw new Error('La foto debe pesar como máximo 5 MB.');
   }
-
-  // Supabase recomienda ArrayBuffer en React Native. Evitamos Blob/File para
-  // no repetir el fallo de Expo 57 al crear blobs desde ArrayBuffer.
-  const bytes = await file.bytes();
+  const { body, size } = await readAvatar(asset);
+  if (size > MAX_AVATAR_BYTES) throw new Error('La foto debe pesar como máximo 5 MB.');
   const avatarPath = `${userData.user.id}/avatar-${Date.now()}.${descriptor.extension}`;
   const { data: previousProfile, error: previousError } = await client
     .from('student_profiles')
@@ -75,7 +76,8 @@ export async function uploadProfileAvatar(asset: ImagePickerAsset) {
 
   const { error: uploadError } = await client.storage
     .from(AVATAR_BUCKET)
-    .upload(avatarPath, exactArrayBuffer(bytes), {
+    .upload(avatarPath, body, {
+      cacheControl: '3600',
       contentType: descriptor.mimeType,
       upsert: false,
     });

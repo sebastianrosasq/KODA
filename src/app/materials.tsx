@@ -28,7 +28,7 @@ export default function MaterialsScreen() {
   const courses = useMemo(() => workspace.courses.filter((course) => course.isActive), [workspace.courses]);
   const [courseId, setCourseId] = useState('');
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
-  const [isLoading, setLoading] = useState(false);
+  const [uploadStage, setUploadStage] = useState<'idle' | 'uploading' | 'analyzing'>('idle');
   const [isLoadingDocuments, setLoadingDocuments] = useState(true);
   const [hasConsent, setHasConsent] = useState(false);
   const [isConsenting, setConsenting] = useState(false);
@@ -104,7 +104,7 @@ export default function MaterialsScreen() {
     if (result.canceled) return;
 
     try {
-      setLoading(true);
+      setUploadStage('uploading');
       setFeedback(null);
       const { documentId } = await uploadStudyDocument({
         asset: result.assets[0],
@@ -121,6 +121,7 @@ export default function MaterialsScreen() {
       }
 
       try {
+        setUploadStage('analyzing');
         await analyzeStudyDocument(documentId, uploadRole === 'study_material' ? flashcardTarget : 3);
         await loadDocuments();
         setFeedback(uploadRole === 'syllabus'
@@ -134,7 +135,7 @@ export default function MaterialsScreen() {
       setFeedback(error instanceof Error ? error.message : 'No se pudo guardar el material. Intenta nuevamente más tarde.');
       await loadDocuments();
     } finally {
-      setLoading(false);
+      setUploadStage('idle');
     }
   };
 
@@ -274,7 +275,12 @@ export default function MaterialsScreen() {
             </View>
           </>
         ) : null}
-        <KodaButton disabled={isLoading || status !== 'signed_in' || !selectedCourseId} icon="cloud-upload-outline" label={isLoading ? 'Guardando…' : uploadRole === 'syllabus' ? 'Elegir sílabo PDF · hasta 12 MB' : 'Elegir PDF o audio · hasta 12 MB'} onPress={() => void chooseAndUpload()} />
+        <KodaButton
+          disabled={uploadStage !== 'idle' || status !== 'signed_in' || !selectedCourseId}
+          icon="cloud-upload-outline"
+          label={uploadStage === 'uploading' ? 'Guardando archivo…' : uploadStage === 'analyzing' ? 'Analizando con IA…' : uploadRole === 'syllabus' ? 'Elegir sílabo PDF · hasta 12 MB' : 'Elegir PDF o audio · hasta 12 MB'}
+          onPress={() => void chooseAndUpload()}
+        />
         <Text style={[styles.limitText, { color: theme.textTertiary }]}>{uploadRole === 'syllabus' ? 'KODA identifica unidades, temas, evaluaciones y actividades. Tú decides si aplicas su agenda.' : `Generará ${flashcardTarget} tarjetas revisables (máximo 6). Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Límite diario de IA: 3 PDFs y 5 audios.`}</Text>
         {feedback ? <Text style={[styles.feedbackText, { color: theme.textSecondary }]}>{feedback}</Text> : null}
       </View>
@@ -391,11 +397,11 @@ function statusLabel(status: StudyDocument['analysisStatus']) {
 const styles = StyleSheet.create({
   privacyCard: { alignItems: 'flex-start', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   privacyIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },
-  privacyCopy: { flex: 1, gap: 3 },
+  privacyCopy: { flex: 1, gap: 3, minWidth: 0 },
   privacyTitle: { fontSize: 14, fontWeight: '900' },
   privacyDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
   coachCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
-  coachCopy: { flex: 1, gap: 3 },
+  coachCopy: { flex: 1, gap: 3, minWidth: 0 },
   coachTitle: { fontSize: 14, fontWeight: '900' },
   coachDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
   noticeCard: { gap: 4, padding: KodaSpacing.lg },
@@ -413,7 +419,7 @@ const styles = StyleSheet.create({
   documentCard: { gap: KodaSpacing.lg, padding: KodaSpacing.lg },
   documentHeader: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md },
   documentIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },
-  documentCopy: { flex: 1, gap: 3 },
+  documentCopy: { flex: 1, gap: 3, minWidth: 0 },
   documentName: { fontSize: 14, fontWeight: '900' },
   documentMeta: { fontSize: 12, fontWeight: '600' },
   analysisContent: { gap: KodaSpacing.md },
@@ -430,7 +436,7 @@ const styles = StyleSheet.create({
   syllabusDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
   syllabusPreview: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   emptyCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
-  emptyCopy: { flex: 1, gap: 2 },
+  emptyCopy: { flex: 1, gap: 2, minWidth: 0 },
   emptyTitle: { fontSize: 14, fontWeight: '900' },
   emptyDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
 });

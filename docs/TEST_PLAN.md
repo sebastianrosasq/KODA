@@ -9,7 +9,8 @@ Las pruebas automatizadas verifican reglas deterministas. La validación de inte
 | `npm test` | Constructor y calificador de simulacros. | No acepta preguntas incompletas/duplicadas; calcula aciertos correctamente. |
 | `npx tsc --noEmit` | Contratos TypeScript de aplicación. | Sin errores de tipos. |
 | `npm run lint` | Reglas de calidad Expo. | Sin errores. |
-| `npx expo export --platform web` | Empaquetado estático sin dispositivo. | Exportación correcta. |
+| `npx expo-doctor` | Configuración Expo, dependencias y coherencia de proyecto. | Todas las comprobaciones pasan. |
+| `npx expo export --platform web` | Empaquetado estático y rutas Expo Router sin dispositivo. | Exportación correcta. |
 
 ## Manual antes de S8
 
@@ -19,9 +20,11 @@ Las pruebas automatizadas verifican reglas deterministas. La validación de inte
 | Acceso | Una visita sin sesión muestra solo el registro/inicio; después de acceder aparece el registro académico y luego KODA. |
 | Google | Si Google está desactivado, se muestra un aviso en KODA y no una página JSON. Después de configurarlo según `AUTH_SETUP.md`, el retorno crea una sesión. |
 | Privacidad | Una cuenta B no lista, descarga ni elimina PDFs, audios o resultados de una cuenta A. |
-| Cuota | El tercer análisis del mismo usuario y día devuelve un mensaje claro; no envía el archivo a Gemini. |
-| Material | Se rechazan archivos que no sean PDF/audio compatible o excedan 12 MB; un material válido genera resumen, tarjetas y preguntas. |
-| Chat IA | Requiere consentimiento; puede usar el análisis de un material seleccionado, conserva el historial privado de esa cuenta, permite borrarlo y respeta el límite de 8 mensajes diarios. |
+| Cuota | El cuarto PDF o el sexto audio del mismo usuario y día devuelve un mensaje claro. Una carga o salida inválida no descuenta una cuota. |
+| Material | Se rechazan archivos vacíos, incompatibles o mayores de 12 MB. Un PDF/audio válido debe pasar de “Guardando archivo” a “Analizando con IA” y producir resumen, tarjetas y preguntas desde el primer intento. |
+| Doble toque y error | Dos toques seguidos no crean dos análisis. Ante una caída real, el documento permanece privado y muestra un reintento seguro. |
+| Texto IA | Un resultado que contenga cifras incrustadas en una palabra se regenera una vez; si persiste, no se guarda como análisis listo. |
+| Chat IA | Requiere consentimiento; puede usar el análisis de un material seleccionado, conserva el historial privado de esa cuenta, permite borrarlo y responde también sin material seleccionado. KODA no impone un cupo de mensajes durante la beta. |
 | Simulacro | No permite finalizar con preguntas sin responder; muestra corrección y explicación al final. |
 | Accesibilidad | Botones, opciones y barra de avance tienen etiqueta/estado accesible; revisar lector de pantalla y modo oscuro en Android. |
 | Error de red | La pantalla no pierde el documento ni presenta un resultado inventado. |
@@ -29,4 +32,4 @@ Las pruebas automatizadas verifican reglas deterministas. La validación de inte
 
 ## Criterio de cierre
 
-S6/S7 quedan cerrados en código y base de datos cuando pasen las pruebas automatizadas. La activación de IA y la pasada en un Android físico se registrarán como comprobación de release en S8, porque requieren una clave real y un dispositivo del equipo.
+S6/S7 quedan cerrados en código y base de datos cuando pasen las pruebas automatizadas. La activación de IA y la pasada en un Android físico se registrarán como comprobación de release en S8, porque requieren una clave real, desplegar las Edge Functions y un dispositivo del equipo.

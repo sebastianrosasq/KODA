@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaScreen } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
@@ -8,6 +9,7 @@ import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function MembershipScreen() {
   const { theme } = useKodaTheme();
+  const [isPlusModalVisible, setPlusModalVisible] = useState(false);
 
   return (
     <KodaScreen>
@@ -40,9 +42,20 @@ export default function MembershipScreen() {
               </View>
             ))}
           </View>
-          {plan.id === 'plus' ? <KodaButton disabled icon="time-outline" label="Aún no disponible" variant="secondary" /> : null}
+          {plan.id === 'plus' ? <KodaButton icon="sparkles-outline" label="Quiero KODA Plus" onPress={() => setPlusModalVisible(true)} variant="secondary" /> : null}
         </KodaCard>
       ))}
+
+      <Modal animationType="fade" onRequestClose={() => setPlusModalVisible(false)} transparent visible={isPlusModalVisible}>
+        <Pressable accessibilityLabel="Cerrar información de KODA Plus" onPress={() => setPlusModalVisible(false)} style={[styles.modalOverlay, { backgroundColor: theme.overlay + '99' }]}>
+          <Pressable onPress={() => undefined} style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.modalEyebrow, { color: theme.accent }]}>KODA PLUS</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Próximamente</Text>
+            <Text style={[styles.modalText, { color: theme.textSecondary }]}>La propuesta es S/ 9.90 al mes e incluiría más análisis, simulacros y seguimiento avanzado. Aún no hay cobros, tarjetas ni suscripciones activas.</Text>
+            <KodaButton label="Entendido" onPress={() => setPlusModalVisible(false)} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KodaScreen>
   );
 }
@@ -61,4 +74,9 @@ const styles = StyleSheet.create({
   highlight: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm },
   dot: { borderRadius: KodaRadius.pill, height: 6, width: 6 },
   highlightText: { flex: 1, fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  modalOverlay: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: KodaSpacing.xl },
+  modalCard: { borderRadius: KodaRadius.lg, borderWidth: 1, gap: KodaSpacing.md, maxWidth: 440, padding: KodaSpacing.xl, width: '100%' },
+  modalEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  modalTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  modalText: { fontSize: 14, fontWeight: '600', lineHeight: 21 },
 });

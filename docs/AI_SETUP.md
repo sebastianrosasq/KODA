@@ -28,8 +28,10 @@ sequenceDiagram
 - Políticas Storage: cada estudiante solo opera objetos cuyo primer directorio es su UUID.
 - Tabla de documentos y resultados protegida por RLS; un estudiante no puede leer los de otro.
 - Consentimiento explícito antes del primer envío a IA.
-- La función verifica JWT, propiedad, tipo, tamaño y usa una cuota atómica de **2 análisis de materiales por estudiante al día** y **8 mensajes del chat por estudiante al día** (hora de Lima).
-- El archivo se pasa en memoria a Gemini; KODA no usa el File API de Gemini ni expone enlaces públicos. El chat recibe solamente la pregunta y, si el estudiante lo elige, el análisis ya validado del material.
+- La función verifica JWT, propiedad, tipo y tamaño. El límite diario de la beta es de **3 PDF** y **5 audios** analizados por estudiante (hora de Lima). El chat no impone un límite propio de mensajes; siguen aplicando las protecciones del proveedor y los límites técnicos de longitud.
+- El archivo se pasa en memoria a Gemini; KODA no usa el File API de Gemini ni expone enlaces públicos. En React Native se carga como `ArrayBuffer` desde la copia local del selector de documentos, que es el formato soportado por Storage. El chat recibe solamente la pregunta y, si el estudiante lo elige, el análisis ya validado del material.
+- Antes de llamar a Gemini, el servidor reclama el material de forma atómica para evitar análisis duplicados por toques repetidos. La cuota se consume solo después de obtener y validar un análisis correcto; una carga o salida inválida no debe descontar un intento.
+- Si un texto generado contiene un número dentro de una palabra (por ejemplo, una letra sustituida por `3`), el servidor pide una regeneración puntual una sola vez. Si persiste, no guarda ese análisis corrupto y solicita reintento.
 - La respuesta se valida antes de guardarla: título, resumen, puntos clave, hasta 8 flashcards y hasta 5 preguntas de cuatro alternativas.
 
 Formatos de audio: MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. El análisis y el chat son ayudas de repaso, no una fuente académica definitiva: la persona debe contrastar resumen, tarjetas y alternativas con su material.
@@ -50,7 +52,7 @@ npx supabase functions deploy analyze-study-document
 npx supabase functions deploy study-coach
 ```
 
-4. Prueba con un PDF o audio no sensible y el chat en una cuenta de desarrollo antes de habilitarlo a más estudiantes.
+4. Prueba con un PDF o audio no sensible y el chat en una cuenta de desarrollo antes de habilitarlo a más estudiantes. La app muestra “Guardando archivo” y luego “Analizando con IA” para que no se confunda el almacenamiento con el análisis.
 5. Consulta las cuotas reales del proyecto en AI Studio antes de aumentar el límite de KODA. El límite local por estudiante evita abusos, pero no sustituye los límites de Google.
 
 ## Límites del plan gratuito

@@ -23,7 +23,7 @@ export const kodaPlans: KodaPlan[] = [
   {
     id: 'plus',
     name: 'KODA Plus',
-    priceLabel: 'Próximamente',
+    priceLabel: 'S/ 9.90 / mes',
     summary: 'Propuesta para estudiantes que quieren análisis y seguimiento avanzado.',
     highlights: [
       'Analítica de preparación por curso',

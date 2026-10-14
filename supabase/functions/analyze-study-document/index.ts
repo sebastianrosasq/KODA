@@ -216,6 +216,22 @@ function readGeminiText(payload: GeminiPayload) {
     .trim() ?? '';
 }
 
+function hasLikelyEncodingArtifact(analysis: Exclude<ReturnType<typeof normalizeAnalysis>, null>) {
+  const texts = [
+    analysis.title,
+    analysis.summary,
+    ...analysis.keyPoints,
+    ...analysis.flashcards.flatMap((card) => [card.question, card.answer]),
+    ...analysis.quizQuestions.flatMap((question) => [question.question, question.explanation, ...question.options]),
+    ...(analysis.syllabus?.units.flatMap((unit) => [unit.title, ...unit.topics]) ?? []),
+    ...(analysis.syllabus?.calendarEvents.map((event) => event.title) ?? []),
+  ];
+
+  // Señala solo palabras largas con una cifra entre letras (por ejemplo,
+  // "tecnolog3as"). No toca fórmulas, fechas, versiones ni abreviaturas.
+  return texts.some((text) => /\b[\p{L}]{2,}\d[\p{L}]{2,}\b/iu.test(text));
+}
+
 async function markDocument(
   client: ReturnType<typeof createClient>,
   documentId: string,
@@ -226,6 +242,18 @@ async function markDocument(
     .update({ ...values, updated_at: new Date().toISOString() })
     .eq('id', documentId);
   if (error) console.error('No se pudo actualizar el estado del documento', error.message);
+}
+
+async function claimDocumentForAnalysis(client: ReturnType<typeof createClient>, documentId: string) {
+  const { data, error } = await client
+    .from('student_study_documents')
+    .update({ analysis_status: 'processing', last_error: null, updated_at: new Date().toISOString() })
+    .eq('id', documentId)
+    .in('analysis_status', ['ready', 'failed'])
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return Boolean(data);
 }
 
 Deno.serve(async (request) => {
@@ -273,6 +301,15 @@ Deno.serve(async (request) => {
     return json({ error: 'La IA aún no está configurada para este entorno.' }, 503);
   }
 
+  let claimed = false;
+  try {
+    claimed = await claimDocumentForAnalysis(adminClient, document.id);
+  } catch (error) {
+    console.error('No se pudo reservar el análisis del documento', error);
+    return json({ error: 'No se pudo preparar el análisis. Inténtalo nuevamente.' }, 500);
+  }
+  if (!claimed) return json({ error: 'Este documento ya se está analizando.' }, 409);
+
   const { data: material, error: downloadError } = await client.storage.from(DOCUMENT_BUCKET).download(document.storage_path);
   if (downloadError || !material || !supportedMimeTypes.has(document.mime_type) || material.size > MAX_STUDY_MATERIAL_BYTES) {
     await markDocument(adminClient, document.id, {
@@ -282,6 +319,77 @@ Deno.serve(async (request) => {
     return json({ error: 'Solo se aceptan PDF o audios compatibles de hasta 12 MB.' }, 400);
   }
 
+  const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash-lite';
+  const sourceData = toBase64(new Uint8Array(await material.arrayBuffer()));
+  const requestAnalysis = async (qualityRetry = false) => {
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [
+              { inlineData: { mimeType: document.mime_type, data: sourceData } },
+              {
+                text: [
+                  document.document_role === 'syllabus'
+                    ? 'Analiza exclusivamente este sílabo PDF. Extrae solo las unidades y temas que estén escritos. Incluye en calendarEvents únicamente evaluaciones o actividades con una fecha completa y explícita; normaliza DD/MM/AAAA o una fecha textual completa a YYYY-MM-DD, pero nunca adivines año, fecha ni contenidos. La agenda es una propuesta que el estudiante revisará.'
+                    : document.content_kind === 'audio'
+                    ? 'Analiza exclusivamente este audio de estudio para una semana de exámenes. Identifica con cautela las ideas expresadas; si una parte no es audible, no la inventes.'
+                    : 'Analiza exclusivamente este PDF para una semana de exámenes.',
+                  'No inventes información ni uses fuentes externas.',
+                  `Escribe en español claro. Resume las ideas verificables, crea exactamente ${flashcardTarget} flashcards útiles y 3 a 5 preguntas de opción múltiple.`,
+                  'Preserva caracteres Unicode, acentos y la ñ. Nunca sustituyas letras de una palabra por números; conserva números solamente cuando sean fórmulas, fechas, cantidades, versiones o identificadores presentes en el material.',
+                  qualityRetry ? 'La respuesta anterior mostró señales de corrupción tipográfica. Regenera el JSON con ortografía española correcta y sin cambiar los números legítimos del material.' : '',
+                  'Cada pregunta debe tener exactamente cuatro opciones, un índice correctOption de 0 a 3 y una explicación breve.',
+                ].filter(Boolean).join(' '),
+              },
+            ],
+          }],
+          generationConfig: {
+            maxOutputTokens: 2200,
+            responseMimeType: 'application/json',
+            responseJsonSchema: document.document_role === 'syllabus' ? syllabusSchema : studySchema(flashcardTarget),
+          },
+        }),
+      },
+    );
+
+    if (!geminiResponse.ok) return { analysis: null, status: geminiResponse.status };
+    const outputText = readGeminiText(await geminiResponse.json() as GeminiPayload);
+    try {
+      return { analysis: normalizeAnalysis(JSON.parse(outputText), document.document_role, flashcardTarget), status: 200 };
+    } catch {
+      return { analysis: null, status: 502 };
+    }
+  };
+
+  let result = await requestAnalysis();
+  if (result.analysis && hasLikelyEncodingArtifact(result.analysis)) result = await requestAnalysis(true);
+  const analysis = result.analysis;
+  if (!analysis) {
+    console.error('Gemini no pudo analizar el documento', result.status);
+    await markDocument(adminClient, document.id, {
+      analysis_status: 'failed',
+      last_error: result.status === 429
+        ? 'Gemini está ocupado. Intenta nuevamente más tarde.'
+        : 'Gemini devolvió un resultado que KODA no pudo usar.',
+    });
+    return json({ error: result.status === 429 ? 'Gemini está temporalmente ocupado. Intenta luego.' : 'No fue posible analizar el documento.' }, result.status === 429 ? 429 : 502);
+  }
+
+  if (hasLikelyEncodingArtifact(analysis)) {
+    await markDocument(adminClient, document.id, {
+      analysis_status: 'failed',
+      last_error: 'KODA detectó texto con caracteres alterados y prefirió no guardarlo. Intenta nuevamente más tarde.',
+    });
+    return json({ error: 'La IA devolvió texto con caracteres alterados. Intenta nuevamente más tarde.' }, 502);
+  }
+
+  // La cuota se descuenta solo después de obtener un análisis válido. Así un
+  // error de red, lectura o formato no obliga a la persona a pagar dos intentos.
   const quotaOperation = document.content_kind === 'audio' ? 'document_audio' : 'document_pdf';
   const quotaLimit = document.content_kind === 'audio' ? 5 : 3;
   const { data: quotaData, error: quotaError } = await adminClient.rpc('consume_koda_ai_quota', {
@@ -291,70 +399,15 @@ Deno.serve(async (request) => {
   const quota = quotaData as { allowed?: boolean; remaining?: number } | null;
   if (quotaError) {
     console.error('No se pudo consumir la cuota de IA', quotaError.message);
+    await markDocument(adminClient, document.id, { analysis_status: 'failed', last_error: 'No se pudo validar tu cuota de IA.' });
     return json({ error: 'No se pudo validar tu cuota de IA.' }, 500);
   }
-  if (!quota?.allowed) return json({ error: `Alcanzaste el límite diario de ${quotaLimit} ${document.content_kind === 'audio' ? 'audios' : 'PDFs'} analizados.` }, 429);
-
-  await markDocument(adminClient, document.id, { analysis_status: 'processing', last_error: null });
-
-  const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash-lite';
-  const geminiResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType: document.mime_type, data: toBase64(new Uint8Array(await material.arrayBuffer())) } },
-            {
-              text: [
-                document.document_role === 'syllabus'
-                  ? 'Analiza exclusivamente este sílabo PDF. Extrae solo las unidades y temas que estén escritos. Incluye en calendarEvents únicamente evaluaciones o actividades con una fecha completa y explícita; normaliza DD/MM/AAAA o una fecha textual completa a YYYY-MM-DD, pero nunca adivines año, fecha ni contenidos. La agenda es una propuesta que el estudiante revisará.'
-                  : document.content_kind === 'audio'
-                  ? 'Analiza exclusivamente este audio de estudio para una semana de exámenes. Identifica con cautela las ideas expresadas; si una parte no es audible, no la inventes.'
-                  : 'Analiza exclusivamente este PDF para una semana de exámenes.',
-                'No inventes información ni uses fuentes externas.',
-                `Escribe en español claro. Resume las ideas verificables, crea exactamente ${flashcardTarget} flashcards útiles y 3 a 5 preguntas de opción múltiple.`,
-                'Cada pregunta debe tener exactamente cuatro opciones, un índice correctOption de 0 a 3 y una explicación breve.',
-              ].join(' '),
-            },
-          ],
-        }],
-        generationConfig: {
-          maxOutputTokens: 2200,
-          responseMimeType: 'application/json',
-          responseJsonSchema: document.document_role === 'syllabus' ? syllabusSchema : studySchema(flashcardTarget),
-        },
-      }),
-    },
-  );
-
-  if (!geminiResponse.ok) {
-    console.error('Gemini no pudo analizar el documento', geminiResponse.status);
+  if (!quota?.allowed) {
     await markDocument(adminClient, document.id, {
       analysis_status: 'failed',
-      last_error: geminiResponse.status === 429
-        ? 'Gemini está ocupado. Intenta nuevamente más tarde.'
-        : 'Gemini no pudo analizar el documento en este momento.',
+      last_error: `Alcanzaste el límite diario de ${quotaLimit} ${document.content_kind === 'audio' ? 'audios' : 'PDFs'} analizados.`,
     });
-    return json({ error: geminiResponse.status === 429 ? 'Gemini está temporalmente ocupado. Intenta luego.' : 'No fue posible analizar el documento.' }, geminiResponse.status === 429 ? 429 : 502);
-  }
-
-  const outputText = readGeminiText(await geminiResponse.json() as GeminiPayload);
-  let analysis = null;
-  try {
-    analysis = normalizeAnalysis(JSON.parse(outputText), document.document_role, flashcardTarget);
-  } catch {
-    analysis = null;
-  }
-  if (!analysis) {
-    await markDocument(adminClient, document.id, {
-      analysis_status: 'failed',
-      last_error: 'Gemini devolvió un formato que KODA no puede usar.',
-    });
-    return json({ error: 'La IA devolvió un análisis no utilizable. Intenta con otro material.' }, 502);
+    return json({ error: `Alcanzaste el límite diario de ${quotaLimit} ${document.content_kind === 'audio' ? 'audios' : 'PDFs'} analizados.` }, 429);
   }
 
   await markDocument(adminClient, document.id, {

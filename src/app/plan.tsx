@@ -157,7 +157,7 @@ export default function PlanScreen() {
         ) : (
           <KodaCard style={styles.emptyCard}>
             <Ionicons color={theme.textTertiary} name="leaf-outline" size={22} />
-            <KodaText tone="secondary">{plan.length ? 'No hay bloques para este día. Puedes reservarlo para descansar o añadir uno.' : 'Aún no organizaste tu semana. Añade un examen y tus horas disponibles para crear el primer bloque.'}</KodaText>
+            <KodaText style={styles.emptyCopy} tone="secondary">{plan.length ? 'No hay bloques para este día. Puedes reservarlo para descansar o añadir uno.' : 'Aún no organizaste tu semana. Añade un examen y tus horas disponibles para crear el primer bloque.'}</KodaText>
           </KodaCard>
         )}
       </KodaReveal>
@@ -184,7 +184,7 @@ export default function PlanScreen() {
         }) : (
           <KodaCard style={styles.emptyCard}>
             <Ionicons color={theme.textTertiary} name="calendar-outline" size={22} />
-            <KodaText tone="secondary">Aún no registras evaluaciones ni actividades. Añade una evaluación para que KODA priorice tus sesiones.</KodaText>
+            <KodaText style={styles.emptyCopy} tone="secondary">Aún no registras evaluaciones ni actividades. Añade una evaluación para que KODA priorice tus sesiones.</KodaText>
           </KodaCard>
         )}
       </KodaReveal>
@@ -208,7 +208,7 @@ export default function PlanScreen() {
         </KodaCard> : (
           <KodaCard style={styles.emptyCard}>
             <Ionicons color={theme.textTertiary} name="list-outline" size={22} />
-            <KodaText tone="secondary">Añade un tema pendiente para que KODA lo distribuya antes de tu examen.</KodaText>
+            <KodaText style={styles.emptyCopy} tone="secondary">Añade un tema pendiente para que KODA lo distribuya antes de tu examen.</KodaText>
           </KodaCard>
         )}
       </KodaReveal>
@@ -278,6 +278,7 @@ const styles = StyleSheet.create({
   reason: { alignItems: 'flex-start', borderRadius: KodaRadius.sm, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.sm },
   reasonText: { flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 17 },
   emptyCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  emptyCopy: { flex: 1, minWidth: 0 },
   examCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   examMark: { borderRadius: KodaRadius.pill, height: 11, width: 11 },
   examCopy: { flex: 1, gap: 2, minWidth: 0 },

@@ -1,5 +1,4 @@
 import type { DocumentPickerAsset } from 'expo-document-picker';
-import { File } from 'expo-file-system';
 
 import { supabase } from '@/lib/supabase';
 
@@ -238,18 +237,22 @@ async function getDatabaseCourseId(clientCourseId: string) {
 }
 
 async function readAsset(asset: DocumentPickerAsset) {
-  const file = new File(asset.uri);
-  const bytes = await file.bytes();
-  // Supabase Storage recomienda ArrayBuffer en React Native. Con Expo 57 evitar
-  // Blob/File es importante: el runtime nativo no puede construir Blob desde un
-  // ArrayBuffer al serializar la subida.
-  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  return { file, body };
+  if (!asset.uri) throw new Error('No pudimos leer el archivo seleccionado. Elígelo nuevamente.');
+
+  // En React Native, Supabase recomienda subir un ArrayBuffer. Leer la URI con
+  // fetch evita la conversión Blob que Expo File puede intentar al pasar sus
+  // bytes a Storage y que provocaba el error de ArrayBuffer en el primer envío.
+  const response = await fetch(asset.uri);
+  if (!response.ok) throw new Error('No pudimos abrir el archivo seleccionado. Inténtalo nuevamente.');
+  const body = await response.arrayBuffer();
+  if (!body.byteLength) throw new Error('El archivo está vacío o no pudo leerse.');
+  return { body, size: body.byteLength };
 }
 
 function getAssetDescriptor(asset: DocumentPickerAsset) {
   const extension = asset.name.split('.').pop()?.toLowerCase() ?? '';
-  const fromMime = asset.mimeType ? normalizedMimeTypes[asset.mimeType.toLowerCase()] : undefined;
+  const mimeType = asset.mimeType?.split(';')[0]?.trim().toLowerCase();
+  const fromMime = mimeType ? normalizedMimeTypes[mimeType] : undefined;
   const fromExtension = mimeTypesByExtension[extension];
   const descriptor = fromMime ?? fromExtension;
   if (!descriptor || (fromMime && fromExtension && fromMime.kind !== fromExtension.kind)) {
@@ -347,8 +350,9 @@ export async function uploadStudyDocument({
   const databaseCourseId = await getDatabaseCourseId(courseId);
 
   const target = Math.max(1, Math.min(8, Math.round(flashcardTarget)));
-  const { file, body } = await readAsset(asset);
-  if (!file.size || file.size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
+  if (asset.size && asset.size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
+  const { body, size } = await readAsset(asset);
+  if (size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
 
   const storagePath = createStoragePath(userData.user.id, descriptor.extension);
   const { data: document, error: documentError } = await client
@@ -362,13 +366,14 @@ export async function uploadStudyDocument({
       content_kind: descriptor.kind,
       document_role: role,
       flashcard_target: target,
-      byte_size: file.size,
+      byte_size: size,
     })
     .select('id')
     .single();
   if (documentError || !document) throw new Error(documentError?.message ?? 'No se pudo preparar el documento.');
 
   const { error: uploadError } = await client.storage.from(DOCUMENT_BUCKET).upload(storagePath, body, {
+    cacheControl: '3600',
     contentType: descriptor.mimeType,
     upsert: false,
   });

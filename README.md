@@ -70,8 +70,10 @@ Para instalar o probar en Android, sigue [GETTING_STARTED.md](docs/GETTING_START
 
 ```powershell
 npx tsc --noEmit
+npm test
 npm run lint
 npx expo-doctor
+npx expo export --platform web
 ```
 
 ## Arquitectura del repositorio
@@ -112,6 +114,7 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 - [Acceso con correo y Google](docs/AUTH_SETUP.md)
 - [Base segura de IA, audios, PDFs y chat](docs/AI_SETUP.md)
 - [Modelo freemium, hipótesis de precio y arquitectura de cobro](docs/MONETIZATION.md)
+- [Estado de preparación para la presentación](docs/PRESENTATION_READINESS.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
 - [Política de privacidad para publicación](docs/PRIVACY.md)
 - [Condiciones de uso para publicación](docs/TERMS.md)

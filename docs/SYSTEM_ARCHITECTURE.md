@@ -60,7 +60,7 @@ sequenceDiagram
     E->>A: Selecciona su PDF
     A->>S: Sube al espacio privado del estudiante
     A->>F: Solicita análisis con sesión autenticada
-    F->>F: Valida propiedad, tipo, tamaño y cuota
+    F->>F: Valida propiedad, tipo y tamaño; evita análisis duplicados
     F->>S: Lee solo el archivo autorizado
     F->>G: Envía el contenido mínimo necesario
     G-->>F: Devuelve resumen o preguntas
@@ -68,7 +68,7 @@ sequenceDiagram
     A-->>E: Muestra el resultado
 ~~~
 
-Este recorrido está implementado desde el Sprint 6. Las funciones validan sesión, propiedad, formato, tamaño y cuota antes de enviar un material a Gemini; el cierre de release incluye verificarlo desde una APK con material no sensible.
+Este recorrido está implementado desde el Sprint 6. Las funciones validan sesión, propiedad, formato y tamaño antes de enviar un material a Gemini. El análisis se reclama de forma atómica para evitar duplicados y la cuota se consume únicamente al contar con una respuesta válida, de modo que un fallo técnico no cobra un reintento. El cierre de release incluye verificarlo desde una APK con material no sensible.
 
 ## Datos principales
 

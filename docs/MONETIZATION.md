@@ -48,7 +48,13 @@ Cuando exista esa autorización, la implementación seguirá este orden:
 4. Pantalla de estado, cancelación, comprobante y soporte; pruebas de pago aprobado, rechazado, duplicado, reembolso y renovación.
 5. Publicar solo después de medición de conversión, costo de IA por usuario y revisión legal/tributaria.
 
-La app muestra hoy una pantalla informativa de KODA Plus sin botón de cobro para comunicar el plan sin engañar ni iniciar una transacción.
+La app muestra hoy un botón informativo de KODA Plus que abre “Próximamente”; no inicia checkout, no guarda tarjetas ni concede beneficios de pago. Así se puede validar interés sin simular una compra.
+
+## Publicidad: decisión actual
+
+No se integran SDKs publicitarios ni anuncios en esta versión. Interrumpir una sesión de repaso o condicionar la respuesta académica a ver publicidad dañaría el valor principal de KODA. Si después de medir el producto se evalúan anuncios, solo se consideraría una opción **voluntaria y claramente etiquetada** —por ejemplo, un anuncio recompensado para un análisis adicional—, nunca anuncios entre tarjetas, simulacros, recordatorios o resultados.
+
+Antes de ese experimento se deberá revisar consentimiento, privacidad, edad de los usuarios, costo por análisis y las políticas vigentes de la red publicitaria. Google documenta que los anuncios recompensados deben mostrar una recompensa declarada y entregarla cuando se complete la visualización; eso no se implementa todavía. [Google AdMob: anuncios recompensados](https://developers.google.com/admob/android/rewarded)
 
 ## Experimento de los próximos 30 días
 

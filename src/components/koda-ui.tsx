@@ -263,7 +263,7 @@ export function KodaPill({
         giveFeedback();
         onPress();
       }}
-      style={({ pressed }) => pressed && styles.pressed}>
+      style={({ pressed }) => [styles.pillPressable, pressed && styles.pressed]}>
       {content}
     </Pressable>
   );
@@ -357,6 +357,7 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderRadius: KodaRadius.lg,
+    minWidth: 0,
   },
   pageHeader: {
     flexDirection: 'row',
@@ -414,11 +415,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: KodaSpacing.sm,
     justifyContent: 'center',
+    minWidth: 0,
     paddingHorizontal: KodaSpacing.lg,
   },
   buttonLabel: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '800',
+    textAlign: 'center',
   },
   iconButton: {
     alignItems: 'center',
@@ -441,6 +445,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minHeight: 34,
     maxWidth: '100%',
+    minWidth: 0,
     justifyContent: 'center',
     paddingHorizontal: KodaSpacing.md,
   },
@@ -448,6 +453,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontSize: 13,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  pillPressable: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   progressTrack: {
     borderRadius: KodaRadius.pill,
