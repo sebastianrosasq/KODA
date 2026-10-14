@@ -411,21 +411,31 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
           .filter((event) => event.courseId === input.courseId)
           .map((event) => `${event.title.trim().toLocaleLowerCase()}|${event.dateIso}|${event.kind ?? 'assessment'}`),
       );
-      const topics = input.units.flatMap((unit) => unit.topics)
-        .map((name) => name.trim())
-        .filter((name) => name && !existingTopicNames.has(name.toLocaleLowerCase()))
-        .map((name) => ({ id: createId('topic'), courseId: input.courseId, name, priority: 2 as const, completed: false }));
-      const events = input.calendarEvents
-        .filter((event) => /^\d{4}-\d{2}-\d{2}$/.test(event.dateIso))
-        .filter((event) => !existingEvents.has(`${event.title.trim().toLocaleLowerCase()}|${event.dateIso}|${event.type === 'activity' ? 'activity' : 'assessment'}`))
-        .map((event) => ({
+      const topics = input.units.flatMap((unit) => unit.topics).reduce<StudyTopic[]>((nextTopics, rawName) => {
+        const name = rawName.trim();
+        const normalizedName = name.toLocaleLowerCase();
+        if (!name || existingTopicNames.has(normalizedName)) return nextTopics;
+        existingTopicNames.add(normalizedName);
+        nextTopics.push({ id: createId('topic'), courseId: input.courseId, name, priority: 2, completed: false });
+        return nextTopics;
+      }, []);
+      const events = input.calendarEvents.reduce<StudentExam[]>((nextEvents, event) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(event.dateIso)) return nextEvents;
+        const title = event.title.trim();
+        const kind = event.type === 'activity' ? 'activity' as const : 'assessment' as const;
+        const eventKey = `${title.toLocaleLowerCase()}|${event.dateIso}|${kind}`;
+        if (!title || existingEvents.has(eventKey)) return nextEvents;
+        existingEvents.add(eventKey);
+        nextEvents.push({
           id: createId('exam'),
           courseId: input.courseId,
-          title: event.title.trim(),
+          title,
           dateIso: event.dateIso,
-          difficulty: event.type === 'evaluation' ? 3 as const : 1 as const,
-          kind: event.type === 'activity' ? 'activity' as const : 'assessment' as const,
-        }));
+          difficulty: event.type === 'evaluation' ? 3 : 1,
+          kind,
+        });
+        return nextEvents;
+      }, []);
       return { ...current, topics: [...current.topics, ...topics], exams: [...current.exams, ...events] };
     });
   }, [updateWorkspace]);

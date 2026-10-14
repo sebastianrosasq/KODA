@@ -295,6 +295,12 @@ export default function MaterialsScreen() {
                     <View style={[styles.syllabusCard, { backgroundColor: theme.accentSoft }] }>
                       <Text style={[styles.syllabusTitle, { color: theme.text }]}>Agenda propuesta por tu sílabo</Text>
                       <Text style={[styles.syllabusDetail, { color: theme.textSecondary }]}>{document.analysis.syllabus.units.length} unidades/temas detectados · {document.analysis.syllabus.calendarEvents.length} fechas verificables</Text>
+                      {document.analysis.syllabus.units.flatMap((unit) => unit.topics).slice(0, 4).map((topic) => (
+                        <Text key={topic} style={[styles.syllabusPreview, { color: theme.textSecondary }]}>• {topic}</Text>
+                      ))}
+                      {document.analysis.syllabus.calendarEvents.slice(0, 5).map((event) => (
+                        <Text key={`${event.title}-${event.dateIso}`} style={[styles.syllabusPreview, { color: theme.textSecondary }]}>• {event.dateIso}: {event.title}</Text>
+                      ))}
                       <KodaButton icon="calendar-outline" label="Aplicar al plan" onPress={() => applySyllabus(document)} variant="secondary" style={styles.actionButton} />
                     </View>
                   ) : null}
@@ -405,6 +411,7 @@ const styles = StyleSheet.create({
   syllabusCard: { borderRadius: KodaRadius.md, gap: KodaSpacing.sm, padding: KodaSpacing.md },
   syllabusTitle: { fontSize: 13, fontWeight: '900' },
   syllabusDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  syllabusPreview: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   emptyCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   emptyCopy: { flex: 1, gap: 2 },
   emptyTitle: { fontSize: 14, fontWeight: '900' },

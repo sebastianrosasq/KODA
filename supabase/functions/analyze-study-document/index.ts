@@ -305,7 +305,7 @@ Deno.serve(async (request) => {
             {
               text: [
                 document.document_role === 'syllabus'
-                  ? 'Analiza exclusivamente este sílabo PDF. Extrae solo las unidades y temas que estén escritos. Incluye en calendarEvents únicamente evaluaciones o actividades que tengan una fecha completa y explícita en formato YYYY-MM-DD; no adivines años, fechas ni contenidos. La agenda es una propuesta que el estudiante revisará.'
+                  ? 'Analiza exclusivamente este sílabo PDF. Extrae solo las unidades y temas que estén escritos. Incluye en calendarEvents únicamente evaluaciones o actividades con una fecha completa y explícita; normaliza DD/MM/AAAA o una fecha textual completa a YYYY-MM-DD, pero nunca adivines año, fecha ni contenidos. La agenda es una propuesta que el estudiante revisará.'
                   : document.content_kind === 'audio'
                   ? 'Analiza exclusivamente este audio de estudio para una semana de exámenes. Identifica con cautela las ideas expresadas; si una parte no es audible, no la inventes.'
                   : 'Analiza exclusivamente este PDF para una semana de exámenes.',
