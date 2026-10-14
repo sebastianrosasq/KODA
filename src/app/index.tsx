@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { KodaReveal } from '@/components/koda-reveal';
 import {
@@ -74,13 +74,18 @@ export default function HomeScreen() {
           <View style={styles.examTopRow}>
           <View style={styles.examCopy}>
             <Text style={[styles.examEyebrow, { color: theme.onAccent }]}>{hasExam ? 'PRÓXIMO EXAMEN' : 'EMPIEZA TU PLAN'}</Text>
-            <Text style={[styles.examCourse, { color: theme.onAccent }]}>{nextExam.course}</Text>
-            <Text style={[styles.examTopic, { color: theme.onAccent }]}>{nextExam.topic}</Text>
+            <Text numberOfLines={2} style={[styles.examCourse, { color: theme.onAccent }]}>{nextExam.course}</Text>
+            <Text numberOfLines={2} style={[styles.examTopic, { color: theme.onAccent }]}>{nextExam.topic}</Text>
           </View>
-          <View style={[styles.daysBadge, { backgroundColor: theme.onAccent }]}>
+          <Pressable
+            accessibilityHint={hasExam ? 'Abre tu plan de estudio' : 'Abre el formulario para añadir tu primer examen'}
+            accessibilityLabel={hasExam ? 'Ver plan del próximo examen' : 'Añadir tu primer examen'}
+            accessibilityRole="button"
+            onPress={() => router.push('/plan')}
+            style={({ pressed }) => [styles.daysBadge, { backgroundColor: theme.onAccent }, pressed && styles.pressedBadge]}>
             <Text style={[styles.daysNumber, { color: theme.accent }]}>{hasExam ? nextExam.remaining.split(' ')[0] : '+'}</Text>
             <Text style={[styles.daysLabel, { color: theme.accent }]}>{hasExam ? 'días' : 'examen'}</Text>
-          </View>
+          </Pressable>
           </View>
 
           <View style={styles.examFooter}>
@@ -115,16 +120,18 @@ export default function HomeScreen() {
       </KodaReveal>
 
       <View style={styles.sectionBlock}>
-        <KodaCard style={[styles.coachCard, { backgroundColor: theme.surfaceMuted }]}>
-          <View style={[styles.coachIcon, { backgroundColor: theme.accentSoft }]}>
-            <Ionicons color={theme.accent} name="sparkles-outline" size={21} />
-          </View>
-          <View style={styles.coachCopy}>
-            <Text style={[styles.coachTitle, { color: theme.text }]}>Repasa con KODA IA</Text>
-            <Text style={[styles.coachText, { color: theme.textSecondary }]}>Carga un PDF o audio y pregunta sobre tu material de estudio.</Text>
-          </View>
-          <KodaButton label="Abrir" onPress={() => router.push('/coach')} variant="secondary" />
-        </KodaCard>
+        <Pressable accessibilityLabel="Abrir KODA IA" accessibilityRole="button" onPress={() => router.push('/coach')} style={({ pressed }) => pressed && styles.pressedCoach}>
+          <KodaCard style={[styles.coachCard, { backgroundColor: theme.accentSoft, borderColor: theme.accentSoft }]}>
+            <View style={[styles.coachIcon, { backgroundColor: theme.surface }]}>
+              <Ionicons color={theme.accent} name="sparkles-outline" size={22} />
+            </View>
+            <View style={styles.coachCopy}>
+              <Text style={[styles.coachTitle, { color: theme.text }]}>Pregunta a KODA IA</Text>
+              <Text style={[styles.coachText, { color: theme.textSecondary }]}>Respuestas directas para estudiar o resolver una duda de tu material.</Text>
+            </View>
+            <KodaButton label="Abrir chat" onPress={() => router.push('/coach')} variant="secondary" />
+          </KodaCard>
+        </Pressable>
       </View>
 
       <View style={styles.sectionBlock}>
@@ -220,10 +227,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1.8,
   },
-  coachCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
-  coachIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },
+  coachCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, minHeight: 86, padding: KodaSpacing.lg },
+  coachIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 46, justifyContent: 'center', width: 46 },
   coachCopy: { flex: 1, gap: 2 },
-  coachTitle: { fontSize: 14, fontWeight: '900' },
+  coachTitle: { fontSize: 15, fontWeight: '900' },
   coachText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   examCard: {
     gap: KodaSpacing.xl,
@@ -245,7 +252,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
   },
   examCourse: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     letterSpacing: -0.7,
     lineHeight: 29,
@@ -263,6 +270,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 66,
   },
+  pressedBadge: { opacity: 0.86, transform: [{ scale: 0.96 }] },
+  pressedCoach: { opacity: 0.9, transform: [{ scale: 0.99 }] },
   daysNumber: {
     fontSize: 23,
     fontWeight: '900',

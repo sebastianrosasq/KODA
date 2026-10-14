@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import {
@@ -15,6 +15,7 @@ import {
   KodaText,
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
+import { generateCourseFlashcards } from '@/features/ai/study-coach';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaData } from '@/providers/koda-data-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
@@ -22,11 +23,13 @@ import type { CourseTone } from '@/types/koda-domain';
 
 export default function ReviewScreen() {
   const { theme } = useKodaTheme();
-  const { workspace, addFlashcard, reviewFlashcard } = useKodaData();
+  const { workspace, addFlashcard, addFlashcards, reviewFlashcard } = useKodaData();
   const [showAnswer, setShowAnswer] = useState(false);
   const [cardOffset, setCardOffset] = useState(0);
   const [isCreateVisible, setCreateVisible] = useState(false);
   const [createCourseId, setCreateCourseId] = useState<string | undefined>();
+  const [generatingCourseId, setGeneratingCourseId] = useState<string | null>(null);
+  const [generationFeedback, setGenerationFeedback] = useState<string | null>(null);
   const pendingCards = useMemo(
     () => workspace.flashcards.slice().sort((left, right) => left.mastery - right.mastery),
     [workspace.flashcards],
@@ -47,6 +50,20 @@ export default function ReviewScreen() {
     reviewFlashcard(card.id, remembered);
     setShowAnswer(false);
     setCardOffset((value) => value + 1);
+  };
+
+  const generateDeck = async (courseId: string, courseName: string) => {
+    try {
+      setGeneratingCourseId(courseId);
+      setGenerationFeedback(null);
+      const cards = await generateCourseFlashcards(courseId);
+      addFlashcards(cards.map((card) => ({ courseId, prompt: card.question, answer: card.answer })));
+      setGenerationFeedback(`KODA creó ${cards.length} tarjetas iniciales para ${courseName}. Revísalas con tus apuntes antes de memorizarlas.`);
+    } catch (error) {
+      Alert.alert('No se pudieron generar las tarjetas', error instanceof Error ? error.message : 'Intenta nuevamente en unos momentos.');
+    } finally {
+      setGeneratingCourseId(null);
+    }
   };
 
   return (
@@ -110,6 +127,8 @@ export default function ReviewScreen() {
 
       <View style={styles.sectionBlock}>
         <KodaSectionTitle title="Tus mazos" />
+        <Text style={[styles.deckHint, { color: theme.textTertiary }]}>Genera un mazo inicial por curso y contrástalo con tu sílabo o apuntes.</Text>
+        {generationFeedback ? <Text accessibilityLiveRegion="polite" style={[styles.generationFeedback, { color: theme.success }]}>{generationFeedback}</Text> : null}
         <View style={styles.deckList}>
           {decks.map(({ course, cards, due }) => (
             <KodaCard key={course.id} style={styles.deckCard}>
@@ -117,10 +136,10 @@ export default function ReviewScreen() {
                 <Ionicons color={theme.onAccent} name="layers-outline" size={18} />
               </View>
               <View style={styles.deckCopy}>
-                <Text style={[styles.deckName, { color: theme.text }]}>{course.name}</Text>
-                <Text style={[styles.deckDetail, { color: theme.textSecondary }]}>{cards.length ? `${due} pendientes · ${cards.length} tarjetas` : 'Aún no hay tarjetas para este curso.'}</Text>
+                <Text numberOfLines={2} style={[styles.deckName, { color: theme.text }]}>{course.name}</Text>
+                <Text numberOfLines={2} style={[styles.deckDetail, { color: theme.textSecondary }]}>{cards.length ? `${due} pendientes · ${cards.length} tarjetas` : 'Genera 6 tarjetas iniciales con KODA IA.'}</Text>
               </View>
-              {!cards.length ? <KodaButton label="Crear" onPress={() => { setCreateCourseId(course.id); setCreateVisible(true); }} variant="secondary" /> : null}
+              {!cards.length ? <KodaButton disabled={generatingCourseId === course.id} icon="sparkles-outline" label={generatingCourseId === course.id ? 'Generando…' : 'Generar IA'} onPress={() => void generateDeck(course.id, course.name)} variant="secondary" /> : null}
             </KodaCard>
           ))}
         </View>
@@ -237,9 +256,11 @@ const styles = StyleSheet.create({
   deckList: { gap: KodaSpacing.sm },
   deckCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   deckIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 40, justifyContent: 'center', width: 40 },
-  deckCopy: { flex: 1, gap: 2 },
+  deckCopy: { flex: 1, gap: 2, minWidth: 0 },
   deckName: { fontSize: 14, fontWeight: '900' },
   deckDetail: { fontSize: 12, fontWeight: '600' },
+  deckHint: { fontSize: 12, fontWeight: '600', lineHeight: 18, marginTop: -KodaSpacing.sm },
+  generationFeedback: { fontSize: 12, fontWeight: '800', lineHeight: 18 },
   masteryCard: { gap: KodaSpacing.md, padding: KodaSpacing.lg },
   masteryHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   masteryTitle: { fontSize: 15, fontWeight: '900' },

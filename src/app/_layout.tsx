@@ -142,6 +142,7 @@ function KodaNavigation() {
         <Tabs.Screen name="materials" options={{ href: null }} />
         <Tabs.Screen name="simulations" options={{ href: null }} />
         <Tabs.Screen name="coach" options={{ href: null }} />
+        <Tabs.Screen name="google-auth" options={{ href: null }} />
       </Tabs>
     </ThemeProvider>
   );

@@ -20,11 +20,11 @@ type CoachMessage = Pick<StudyCoachMessage, 'id' | 'role' | 'text'>;
 const welcomeMessage: CoachMessage = {
   id: 'welcome',
   role: 'assistant',
-  text: 'Hola, soy KODA. Puedo ayudarte a preparar tu examen, explicarte un concepto o preguntarte sobre un material que ya analizaste.',
+  text: '¿Qué necesitas repasar?',
 };
 
 function CoachMessageText({ message, color }: { message: CoachMessage; color: string }) {
-  const fragments = message.text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  const fragments = message.text.replaceAll('**', '').split(/(\*[^*]+\*)/g);
 
   return (
     <Text style={[styles.messageText, { color, fontWeight: message.role === 'student' ? '700' : '500' }]}>
@@ -231,11 +231,8 @@ export default function CoachScreen() {
           maxLength={1200}
           multiline
           onChangeText={setPrompt}
-          onKeyPress={(event) => {
-            const nativeEvent = event.nativeEvent as typeof event.nativeEvent & { shiftKey?: boolean };
-            if (Platform.OS !== 'web' || nativeEvent.key !== 'Enter' || nativeEvent.shiftKey) return;
-            event.preventDefault();
-            void submit();
+          onSubmitEditing={() => {
+            if (Platform.OS !== 'web') void submit();
           }}
           placeholder="Ejemplo: explícamelo con un caso práctico"
           placeholderTextColor={theme.textTertiary}

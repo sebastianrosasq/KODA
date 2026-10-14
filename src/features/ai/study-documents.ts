@@ -197,11 +197,16 @@ async function getDatabaseCourseId(clientCourseId: string) {
   return databaseCourseId;
 }
 
-async function readAsset(asset: DocumentPickerAsset) {
-  if (asset.file) return asset.file;
+async function readAsset(asset: DocumentPickerAsset, mimeType: string) {
+  if (asset.file) {
+    return new Blob([await asset.file.arrayBuffer()], { type: mimeType });
+  }
   const response = await fetch(asset.uri);
   if (!response.ok) throw new Error('No se pudo abrir el material elegido.');
-  return response.blob();
+  // Algunos selectores Android etiquetan archivos válidos como text/plain.
+  // Se conserva el contenido, pero se corrige el tipo con la extensión validada
+  // antes de enviarlo a Storage y a Gemini.
+  return new Blob([await response.arrayBuffer()], { type: mimeType });
 }
 
 function getAssetDescriptor(asset: DocumentPickerAsset) {
@@ -230,6 +235,9 @@ export function friendlyFunctionError(error: unknown, fallback = 'No se pudo com
     if (typeof value !== 'string' || !value.trim()) return '';
     if (value.includes('La IA aún no está configurada')) {
       return 'La asistencia con IA se está preparando. Intenta nuevamente cuando esté disponible.';
+    }
+    if (/mime type|mime_type|not supported/i.test(value)) {
+      return 'No pudimos reconocer el formato del archivo. Elige un PDF o un audio compatible (MP3, WAV, M4A, AAC, OGG, FLAC o WEBM).';
     }
     return value.trim();
   };
@@ -289,7 +297,7 @@ export async function uploadStudyDocument({ asset, courseId }: { asset: Document
   const descriptor = getAssetDescriptor(asset);
   const databaseCourseId = await getDatabaseCourseId(courseId);
 
-  const file = await readAsset(asset);
+  const file = await readAsset(asset, descriptor.mimeType);
   if (!file.size || file.size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
 
   const storagePath = createStoragePath(userData.user.id, descriptor.extension);
@@ -314,6 +322,9 @@ export async function uploadStudyDocument({ asset, courseId }: { asset: Document
   });
   if (uploadError) {
     await client.from('student_study_documents').delete().eq('id', document.id);
+    if (/mime type|mime_type|not supported/i.test(uploadError.message)) {
+      throw new Error('No pudimos reconocer el formato del archivo. Elige un PDF o un audio compatible (MP3, WAV, M4A, AAC, OGG, FLAC o WEBM).');
+    }
     throw new Error(uploadError.message);
   }
 

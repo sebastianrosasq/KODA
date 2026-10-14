@@ -2,7 +2,7 @@
   "expo": {
     "name": "KODA",
     "slug": "koda",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/koda-icon.png",
     "scheme": "koda",
@@ -11,6 +11,8 @@
       "icon": "./assets/images/koda-icon.png"
     },
     "android": {
+      "package": "com.sebastianrosas.koda",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#0B0C0F",
         "foregroundImage": "./assets/images/koda-mark.png"
@@ -51,6 +53,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5b5708d3-7029-433f-850f-884f62a7a5be"
+      }
+    },
+    "owner": "sebastianrsoas"
   }
 }

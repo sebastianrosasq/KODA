@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
@@ -60,6 +61,11 @@ export default function ProfileScreen() {
   };
 
   const updateReminders = async () => {
+    if (!workspace.availability.length) {
+      setReminderMessage('Primero añade al menos un bloque en tu plan. Así KODA sabrá cuándo avisarte.');
+      router.push('/plan');
+      return;
+    }
     setSchedulingReminders(true);
     try {
       const result = await scheduleStudyReminders(workspace.availability);
@@ -243,8 +249,8 @@ export default function ProfileScreen() {
             <Text style={[styles.preferenceText, { color: theme.textSecondary }]}>{reminderStatus?.message ?? 'Revisando los avisos de tu plan actual…'}</Text>
           </View>
           <KodaButton
-            disabled={isSchedulingReminders || !workspace.availability.length || reminderStatus?.status === 'unavailable'}
-            label={isSchedulingReminders ? 'Actualizando…' : reminderStatus?.status === 'active' ? 'Actualizar' : reminderStatus?.status === 'unavailable' ? 'En teléfono' : 'Activar'}
+            disabled={isSchedulingReminders || reminderStatus?.status === 'unavailable'}
+            label={isSchedulingReminders ? 'Actualizando…' : reminderStatus?.status === 'active' ? 'Actualizar' : reminderStatus?.status === 'unavailable' ? 'En teléfono' : workspace.availability.length ? 'Activar' : 'Configurar'}
             onPress={() => void updateReminders()}
           />
         </KodaCard>

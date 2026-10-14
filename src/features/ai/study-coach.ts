@@ -14,6 +14,11 @@ export type StudyCoachMessage = {
   createdAt: string;
 };
 
+export type GeneratedCourseFlashcard = {
+  question: string;
+  answer: string;
+};
+
 type StudyCoachMessageRow = {
   id: string;
   role: StudyCoachMessage['role'];
@@ -108,4 +113,29 @@ export async function askStudyCoach(input: { message: string; documentId?: strin
     remainingMessages: typeof result.remainingMessages === 'number' ? Math.max(0, result.remainingMessages) : 0,
     historySaved: result.historySaved !== false,
   } satisfies StudyCoachReply;
+}
+
+export async function generateCourseFlashcards(courseId: string) {
+  if (!courseId.trim()) throw new Error('Selecciona un curso para generar tarjetas.');
+
+  const { data, error } = await clientOrThrow().functions.invoke('study-coach', {
+    body: { action: 'flashcards', courseId },
+  });
+  if (error) {
+    const friendlyMessage = await friendlyFunctionError(error, 'No se pudieron generar las tarjetas.');
+    throw new Error(friendlyMessage || 'No se pudieron generar las tarjetas.');
+  }
+
+  const rawCards = (data as { flashcards?: unknown } | null)?.flashcards;
+  const flashcards = Array.isArray(rawCards)
+    ? rawCards.flatMap((card) => {
+      if (!card || typeof card !== 'object') return [];
+      const value = card as Record<string, unknown>;
+      const question = typeof value.question === 'string' ? value.question.trim().slice(0, 800) : '';
+      const answer = typeof value.answer === 'string' ? value.answer.trim().slice(0, 1200) : '';
+      return question && answer ? [{ question, answer }] : [];
+    })
+    : [];
+  if (flashcards.length < 3) throw new Error('KODA no devolvió suficientes tarjetas útiles. Intenta nuevamente.');
+  return flashcards satisfies GeneratedCourseFlashcard[];
 }

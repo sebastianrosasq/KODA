@@ -134,8 +134,8 @@ export default function PlanScreen() {
                 <KodaCard style={[styles.sessionCard, session.completed && { opacity: 0.66 }]}>
                   <View style={styles.sessionTitleRow}>
                     <View style={styles.sessionCopy}>
-                      <Text style={[styles.sessionTitle, { color: theme.text }]}>{session.title}</Text>
-                      <Text style={[styles.sessionCourse, { color: theme.textSecondary }]}>{session.courseName}</Text>
+                      <Text numberOfLines={2} style={[styles.sessionTitle, { color: theme.text }]}>{session.title}</Text>
+                      <Text numberOfLines={2} style={[styles.sessionCourse, { color: theme.textSecondary }]}>{session.courseName}</Text>
                     </View>
                     <KodaIconButton
                       icon={session.completed ? 'checkmark-circle' : 'checkmark-circle-outline'}
@@ -160,7 +160,8 @@ export default function PlanScreen() {
       </KodaReveal>
 
       <KodaReveal delay={180} style={styles.sectionBlock}>
-        <KodaSectionTitle title="Exámenes próximos" action="Agregar" onActionPress={() => setEditorVisible(true)} />
+        <KodaSectionTitle title="Próximas evaluaciones" action="Añadir" onActionPress={() => setEditorVisible(true)} />
+        <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>KODA usa estas fechas para decidir qué estudiar primero.</Text>
         {examNotice ? (
           <View accessibilityLiveRegion="polite" style={[styles.examNotice, { backgroundColor: theme.successSoft }]}>
             <Ionicons color={theme.success} name="checkmark-circle-outline" size={18} />
@@ -174,8 +175,8 @@ export default function PlanScreen() {
             <KodaCard key={exam.id} style={styles.examCard}>
               <View style={[styles.examMark, { backgroundColor: course ? getToneColor(course.tone, theme) : theme.accent }]} />
               <View style={styles.examCopy}>
-                <Text style={[styles.examTitle, { color: theme.text }]}>{exam.title}</Text>
-                <Text style={[styles.examMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Curso sin asignar'} · {formatExamDate(exam.dateIso)}</Text>
+                <Text numberOfLines={2} style={[styles.examTitle, { color: theme.text }]}>{exam.title}</Text>
+                <Text numberOfLines={2} style={[styles.examMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Curso sin asignar'} · {formatExamDate(exam.dateIso)}</Text>
               </View>
               <View style={styles.examActions}>
                 <Text style={[styles.examDays, { color: theme.text }]}>{formatDaysUntil(daysUntil)}</Text>
@@ -239,7 +240,7 @@ function getWeekDays(): { day: DayLabel; date: number; weekday: Exclude<DayLabel
 function formatDaysUntil(days: number) {
   if (days === 0) return 'Hoy';
   if (days === 1) return 'Mañana';
-  return `${days} d`;
+  return `Faltan ${days} d`;
 }
 
 function getToneColor(tone: CourseTone, theme: ReturnType<typeof useKodaTheme>['theme']) {
@@ -248,17 +249,17 @@ function getToneColor(tone: CourseTone, theme: ReturnType<typeof useKodaTheme>['
 
 const styles = StyleSheet.create({
   summaryCard: { gap: KodaSpacing.lg, padding: KodaSpacing.xl },
-  summaryTop: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  summaryTop: { alignItems: 'flex-start', flexDirection: 'row', gap: KodaSpacing.sm, justifyContent: 'space-between' },
   summaryKicker: { fontSize: 11, fontWeight: '900', letterSpacing: 0.9 },
   summaryValue: { fontSize: 27, fontWeight: '900', letterSpacing: -1, marginTop: 4 },
-  statusPill: { alignItems: 'center', borderRadius: KodaRadius.pill, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
+  statusPill: { alignItems: 'center', borderRadius: KodaRadius.pill, flexDirection: 'row', flexShrink: 0, gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
   statusPillText: { fontSize: 12, fontWeight: '900' },
   summaryDescription: { fontSize: 13 },
   calendarBlock: { gap: KodaSpacing.sm, marginTop: -KodaSpacing.sm },
   calendarLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
   weekCalendar: { borderRadius: KodaRadius.md, borderWidth: 1, flexDirection: 'row', padding: KodaSpacing.xs },
   calendarDay: { alignItems: 'center', borderRadius: KodaRadius.sm, flex: 1, gap: 2, minHeight: 58, justifyContent: 'center' },
-  calendarWeekday: { fontSize: 10, fontWeight: '900' },
+  calendarWeekday: { fontSize: 9, fontWeight: '900' },
   calendarDate: { fontSize: 16, fontWeight: '900' },
   sectionBlock: { gap: KodaSpacing.md },
   timeline: { gap: 0 },
@@ -271,7 +272,7 @@ const styles = StyleSheet.create({
   timelineLine: { flex: 1, width: 1 },
   sessionCard: { flex: 1, gap: KodaSpacing.md, marginBottom: KodaSpacing.md, padding: KodaSpacing.lg },
   sessionTitleRow: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm, justifyContent: 'space-between' },
-  sessionCopy: { flex: 1, gap: 3 },
+  sessionCopy: { flex: 1, gap: 3, minWidth: 0 },
   sessionTitle: { fontSize: 15, fontWeight: '800' },
   sessionCourse: { fontSize: 13, fontWeight: '600' },
   reason: { alignItems: 'flex-start', borderRadius: KodaRadius.sm, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.sm },
@@ -279,14 +280,15 @@ const styles = StyleSheet.create({
   emptyCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   examCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   examMark: { borderRadius: KodaRadius.pill, height: 11, width: 11 },
-  examCopy: { flex: 1, gap: 2 },
+  examCopy: { flex: 1, gap: 2, minWidth: 0 },
   examTitle: { fontSize: 14, fontWeight: '900' },
   examMeta: { fontSize: 12, fontWeight: '600' },
   examActions: { alignItems: 'flex-end', gap: KodaSpacing.xs },
-  examDays: { fontSize: 12, fontWeight: '900' },
+  examDays: { fontSize: 11, fontWeight: '900', textAlign: 'right' },
   deleteExamButton: { height: 34, width: 34 },
   examNotice: { alignItems: 'center', borderRadius: KodaRadius.md, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.md },
   examNoticeText: { flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 },
+  sectionHint: { fontSize: 12, fontWeight: '600', lineHeight: 17, marginTop: -KodaSpacing.sm },
   topicCard: { padding: KodaSpacing.md },
   topicRow: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm, paddingVertical: KodaSpacing.sm },
   topicDot: { borderRadius: KodaRadius.pill, height: 8, width: 8 },

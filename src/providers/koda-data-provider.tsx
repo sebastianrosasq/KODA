@@ -162,6 +162,7 @@ type KodaDataContextValue = {
   addTopic: (topic: Omit<StudyTopic, 'id' | 'completed'>) => void;
   toggleTopic: (topicId: string) => void;
   addFlashcard: (flashcard: Omit<StudyFlashcard, 'id' | 'mastery'>) => void;
+  addFlashcards: (flashcards: Omit<StudyFlashcard, 'id' | 'mastery'>[]) => void;
   reviewFlashcard: (flashcardId: string, remembered: boolean) => void;
   updateAvailability: (availability: AvailabilityBlock[]) => void;
   completeSession: (sessionId: string) => void;
@@ -410,6 +411,16 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     }));
   }, [updateWorkspace]);
 
+  const addFlashcards = useCallback((flashcards: Omit<StudyFlashcard, 'id' | 'mastery'>[]) => {
+    const cards = flashcards.flatMap((flashcard) => {
+      const prompt = flashcard.prompt.trim();
+      const answer = flashcard.answer.trim();
+      return prompt && answer ? [{ ...flashcard, prompt, answer, id: createId('flashcard'), mastery: 0 as const }] : [];
+    });
+    if (!cards.length) return;
+    updateWorkspace((current) => ({ ...current, flashcards: [...current.flashcards, ...cards] }));
+  }, [updateWorkspace]);
+
   const reviewFlashcard = useCallback((flashcardId: string, remembered: boolean) => {
     updateWorkspace((current) => ({
       ...current,
@@ -498,6 +509,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       removeExam,
       addTopic,
       addFlashcard,
+      addFlashcards,
       toggleTopic,
       reviewFlashcard,
       updateAvailability,
@@ -511,6 +523,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       removeExam,
       addTopic,
       addFlashcard,
+      addFlashcards,
       completeSession,
       clearLocalWorkspace,
       dashboard,
