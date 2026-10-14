@@ -1,4 +1,10 @@
-# KODA
+<p align="center">
+  <img src="assets/images/koda-mark.png" alt="Logotipo de KODA" width="104">
+</p>
+
+<h1 align="center">KODA</h1>
+
+<p align="center">Tu semana de exámenes, en orden.</p>
 
 > Una app móvil para que estudiantes peruanos lleguen a la semana de exámenes con cursos, temas y tiempo de estudio en orden.
 
@@ -76,6 +82,15 @@ npx expo-doctor
 npx expo export --platform web
 ```
 
+Antes de entregar una APK que use IA, publica las dos funciones que procesan el material y el chat:
+
+```powershell
+npx supabase functions deploy analyze-study-document
+npx supabase functions deploy study-coach
+```
+
+Después comprueba el acceso, una subida de PDF o audio y el chat en un dispositivo físico. Cuando esas comprobaciones estén listas, crea la distribución interna con `npx eas-cli@latest build --platform android --profile preview`.
+
 ## Arquitectura del repositorio
 
 ```text
@@ -111,7 +126,6 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 - [Arquitectura, límites de seguridad y recorrido de IA](docs/SYSTEM_ARCHITECTURE.md)
 - [Plan S1–S8](docs/SPRINTS.md)
 - [Detalle técnico de Sprints 2 y 3](docs/SPRINT_2_3.md)
-- [Acceso con correo y Google](docs/AUTH_SETUP.md)
 - [Base segura de IA, audios, PDFs y chat](docs/AI_SETUP.md)
 - [Modelo freemium, hipótesis de precio y arquitectura de cobro](docs/MONETIZATION.md)
 - [Estado de preparación para la presentación](docs/PRESENTATION_READINESS.md)

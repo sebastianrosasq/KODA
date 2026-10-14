@@ -33,7 +33,7 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const image = <Image accessibilityLabel="Logotipo de KODA" style={styles.image} source={require('@/assets/images/koda-mark.png')} />;
 
   return animate ? (
     <Animated.View
@@ -104,7 +104,7 @@ export function AnimatedIcon() {
 
       <Animated.View entering={keyframe.duration(DURATION)} style={styles.background} />
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image accessibilityLabel="Logotipo de KODA" style={styles.image} source={require('@/assets/images/koda-mark.png')} />
       </Animated.View>
     </View>
   );
@@ -133,14 +133,14 @@ const styles = StyleSheet.create({
   },
   background: {
     borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
+    experimental_backgroundImage: `linear-gradient(180deg, #A98BFF, #6D4AFF)`,
     width: 128,
     height: 128,
     position: 'absolute',
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#0B0C0F',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

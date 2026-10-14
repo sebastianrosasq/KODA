@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   topicCard: { padding: KodaSpacing.md },
   topicRow: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm, paddingVertical: KodaSpacing.sm },
   topicDot: { borderRadius: KodaRadius.pill, height: 8, width: 8 },
-  topicCopy: { flex: 1, gap: 2 },
+  topicCopy: { flex: 1, gap: 2, minWidth: 0 },
   topicTitle: { fontSize: 13, fontWeight: '800' },
   topicMeta: { fontSize: 11, fontWeight: '600' },
   topicPriority: { fontSize: 12, fontWeight: '900' },

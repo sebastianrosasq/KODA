@@ -45,6 +45,10 @@ export function KodaAuthProvider({ children }: { children: ReactNode }) {
       setStatus(nextSession ? 'signed_in' : 'signed_out');
     });
 
+    // En React Native no hay una pestaña de navegador que mantenga la sesión
+    // activa por nosotros. Iniciamos la renovación al montar el proveedor y la
+    // detenemos cuando la aplicación pasa a segundo plano.
+    if (Platform.OS !== 'web') client.auth.startAutoRefresh();
     const appStateListener = Platform.OS === 'web'
       ? undefined
       : AppState.addEventListener('change', (state) => {
@@ -56,6 +60,7 @@ export function KodaAuthProvider({ children }: { children: ReactNode }) {
       active = false;
       authListener.subscription.unsubscribe();
       appStateListener?.remove();
+      if (Platform.OS !== 'web') client.auth.stopAutoRefresh();
     };
   }, []);
 

@@ -128,6 +128,7 @@ const styles = StyleSheet.create({
   scoreCopy: {
     flex: 1,
     gap: 4,
+    minWidth: 0,
   },
   scoreTitle: {
     fontSize: 17,
@@ -158,6 +159,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     gap: KodaSpacing.sm,
+    minWidth: 0,
     paddingRight: KodaSpacing.md,
   },
   courseDot: {
@@ -169,6 +171,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '900',
+    minWidth: 0,
   },
   coursePercent: {
     fontSize: 14,
@@ -194,6 +197,7 @@ const styles = StyleSheet.create({
   alertCopy: {
     flex: 1,
     gap: 3,
+    minWidth: 0,
   },
   alertTitle: {
     fontSize: 15,

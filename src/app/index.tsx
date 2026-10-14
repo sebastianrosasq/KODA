@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   coachCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, minHeight: 86, padding: KodaSpacing.lg },
   coachIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 46, justifyContent: 'center', width: 46 },
-  coachCopy: { flex: 1, gap: 2 },
+  coachCopy: { flex: 1, gap: 2, minWidth: 0 },
   coachTitle: { fontSize: 15, fontWeight: '900' },
   coachText: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   examCard: {
@@ -245,6 +245,7 @@ const styles = StyleSheet.create({
   examCopy: {
     flex: 1,
     gap: KodaSpacing.xs,
+    minWidth: 0,
   },
   examEyebrow: {
     fontSize: 11,
@@ -358,6 +359,7 @@ const styles = StyleSheet.create({
   sessionCopy: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
   },
   sessionTitle: {
     fontSize: 14,
@@ -399,6 +401,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '800',
+    minWidth: 0,
   },
   coursePercent: {
     fontSize: 13,
@@ -413,6 +416,7 @@ const styles = StyleSheet.create({
   miniProfileCopy: {
     flex: 1,
     gap: 2,
+    minWidth: 0,
   },
   miniProfileTitle: {
     fontSize: 13,

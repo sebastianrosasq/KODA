@@ -314,11 +314,11 @@ const styles = StyleSheet.create({
   analyticsDivider: { alignSelf: 'stretch', backgroundColor: '#A9A6B0', opacity: 0.32, width: 1 },
   sourceCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.md },
   sourceIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },
-  sourceCopy: { flex: 1, gap: 3 },
+  sourceCopy: { flex: 1, gap: 3, minWidth: 0 },
   sourceTitle: { fontSize: 14, fontWeight: '900' },
   sourceDetail: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   emptyCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
-  emptyCopy: { flex: 1, gap: 2 },
+  emptyCopy: { flex: 1, gap: 2, minWidth: 0 },
   emptyTitle: { fontSize: 14, fontWeight: '900' },
   emptyDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
 });
