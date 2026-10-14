@@ -8,7 +8,7 @@ En Supabase abre **Authentication → Providers → Email** y verifica que el pr
 
 ## Google
 
-Estado actual del proyecto KODA: el código está listo, pero el proveedor de Google está **desactivado** en Supabase. Por eso aparecía el mensaje `Unsupported provider: provider is not enabled` en el navegador. Hasta completar los pasos siguientes, el acceso con correo y contraseña sí queda disponible.
+El código de KODA está listo para Google. El proveedor debe habilitarse una vez en cada entorno de Supabase y probarse tanto en navegador como en una APK; mientras no esté activo en un entorno, KODA muestra un aviso claro y mantiene disponible el acceso con correo y contraseña.
 
 No subas ni compartas secretos en GitHub, `.env` ni el chat. La configuración se realiza una sola vez por una persona administradora:
 
@@ -19,7 +19,7 @@ No subas ni compartas secretos en GitHub, `.env` ni el chat. La configuración s
    https://ipsxfienbbfscwjixxdl.supabase.co/auth/v1/callback
    ```
 
-3. En Supabase abre **Authentication → Providers → Google**, habilítalo y registra el Client ID y Client Secret generados por Google.
+3. En Supabase abre **Authentication → Providers → Google**, habilítalo y registra el Client ID y Client Secret generados por Google. No los copies al repositorio, `.env` de la APK ni un chat.
 4. En **Authentication → URL Configuration** agrega las URL permitidas:
 
    ```text
@@ -31,4 +31,4 @@ No subas ni compartas secretos en GitHub, `.env` ni el chat. La configuración s
    Cuando haya un dominio web de producción, agrégalo también a esta lista.
 5. Para probar Google en Android se requiere una compilación de desarrollo o la APK instalada, porque el retorno usa el esquema privado `koda://google-auth`. Expo Go sirve para la interfaz, pero no es el destino de prueba de OAuth de producción.
 
-El botón de Google de KODA consulta primero el estado público del proveedor y muestra un aviso claro si falta esta configuración, en vez de navegar a una página JSON de error. No almacena secretos de Google dentro de la aplicación. Tras guardar los cambios en Supabase, prueba primero en el navegador; para Android usa una APK o una compilación de desarrollo.
+El botón de Google de KODA consulta primero el estado público del proveedor y muestra un aviso claro si falta esta configuración, en vez de navegar a una página JSON de error. No almacena secretos de Google dentro de la aplicación. Tras guardar los cambios en Supabase, prueba primero en el navegador y después con una APK o una compilación de desarrollo.

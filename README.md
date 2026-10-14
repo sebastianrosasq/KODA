@@ -9,7 +9,7 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Área | Estado | Qué incluye hoy |
 | --- | --- | --- |
 | Fundación y diseño | Listo | Expo Router, TypeScript, diseño claro/oscuro y componentes reutilizables. |
-| Cuenta y datos | En configuración | Correo, sesión segura, RLS y sincronización; Google requiere registrar el proveedor externo. |
+| Cuenta y datos | Listo | Correo, sesión segura, RLS y sincronización; Google funciona cuando el proveedor está habilitado en el entorno correspondiente. |
 | Organización | Listo | Cursos, exámenes, temas, disponibilidad y un plan explicable. |
 | Catálogo curricular | En crecimiento | 15 instituciones indexadas; 7 planes verificados, 380 cursos y registro inicial solo con mallas completas. |
 | Calendario académico | En crecimiento | 9 periodos 2026 con 34 eventos oficiales de matrícula, clases y evaluaciones. |

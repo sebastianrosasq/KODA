@@ -68,7 +68,7 @@ sequenceDiagram
     A-->>E: Muestra el resultado
 ~~~
 
-Esto se implementará en el Sprint 6; no forma parte del código del Sprint 1.
+Este recorrido está implementado desde el Sprint 6. Las funciones validan sesión, propiedad, formato, tamaño y cuota antes de enviar un material a Gemini; el cierre de release incluye verificarlo desde una APK con material no sensible.
 
 ## Datos principales
 

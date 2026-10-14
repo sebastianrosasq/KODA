@@ -1,6 +1,6 @@
 # IA, materiales privados y chat · Sprint 6
 
-KODA usa Gemini únicamente desde una Edge Function de Supabase. La APK no conoce ni puede extraer la clave de Gemini. El modelo inicial es `gemini-3.5-flash-lite`, elegido para análisis de documentos de alto volumen y respuestas estructuradas; se puede reemplazar mediante un secreto sin cambiar la aplicación.
+KODA usa Gemini únicamente desde una Edge Function de Supabase. La APK no conoce ni puede extraer la clave de Gemini. El modelo inicial es `gemini-3.5-flash-lite`, elegido para análisis de documentos de alto volumen y respuestas estructuradas; se puede reemplazar mediante un secreto sin cambiar la aplicación. El historial del chat se guarda de forma privada por cuenta y se puede borrar desde KODA.
 
 ## Flujo seguro
 
@@ -34,7 +34,7 @@ sequenceDiagram
 
 Formatos de audio: MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. El análisis y el chat son ayudas de repaso, no una fuente académica definitiva: la persona debe contrastar resumen, tarjetas y alternativas con su material.
 
-## Activación por el responsable
+## Activación o cambio de entorno por el responsable
 
 1. Crea una clave de servidor en [Google AI Studio](https://aistudio.google.com/app/apikey).
 2. Guárdala **solo** como secreto de Supabase. Nunca en `.env`, GitHub, la APK ni un chat.
@@ -50,7 +50,7 @@ npx supabase functions deploy analyze-study-document
 npx supabase functions deploy study-coach
 ```
 
-4. Prueba con un PDF o audio no sensible en una cuenta de desarrollo antes de habilitarlo a más estudiantes.
+4. Prueba con un PDF o audio no sensible y el chat en una cuenta de desarrollo antes de habilitarlo a más estudiantes.
 5. Consulta las cuotas reales del proyecto en AI Studio antes de aumentar el límite de KODA. El límite local por estudiante evita abusos, pero no sustituye los límites de Google.
 
 ## Límites del plan gratuito
