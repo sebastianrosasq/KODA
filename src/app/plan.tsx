@@ -46,8 +46,8 @@ export default function PlanScreen() {
     const exam = workspace.exams.find((item) => item.id === examId);
     if (!exam) return;
     Alert.alert(
-      '¿Eliminar este examen?',
-      `${exam.title} dejará de influir en tu plan de estudio.`,
+      `¿Eliminar ${exam.kind === 'activity' ? 'esta actividad' : 'esta evaluación'}?`,
+      `${exam.title} dejará de aparecer en tu agenda.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -55,7 +55,7 @@ export default function PlanScreen() {
           style: 'destructive',
           onPress: () => {
             removeExam(examId);
-            setExamNotice('Examen eliminado. Tu plan se reajustó.');
+            setExamNotice('Evento eliminado. Tu plan se reajustó.');
           },
         },
       ],
@@ -160,8 +160,8 @@ export default function PlanScreen() {
       </KodaReveal>
 
       <KodaReveal delay={180} style={styles.sectionBlock}>
-        <KodaSectionTitle title="Próximas evaluaciones" action="Añadir" onActionPress={() => setEditorVisible(true)} />
-        <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>KODA usa estas fechas para decidir qué estudiar primero.</Text>
+        <KodaSectionTitle title="Próximas evaluaciones y actividades" action="Añadir" onActionPress={() => setEditorVisible(true)} />
+        <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>KODA prioriza las evaluaciones; las actividades quedan visibles en tu agenda.</Text>
         {examNotice ? (
           <View accessibilityLiveRegion="polite" style={[styles.examNotice, { backgroundColor: theme.successSoft }]}>
             <Ionicons color={theme.success} name="checkmark-circle-outline" size={18} />
@@ -176,7 +176,7 @@ export default function PlanScreen() {
               <View style={[styles.examMark, { backgroundColor: course ? getToneColor(course.tone, theme) : theme.accent }]} />
               <View style={styles.examCopy}>
                 <Text numberOfLines={2} style={[styles.examTitle, { color: theme.text }]}>{exam.title}</Text>
-                <Text numberOfLines={2} style={[styles.examMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Curso sin asignar'} · {formatExamDate(exam.dateIso)}</Text>
+                <Text numberOfLines={2} style={[styles.examMeta, { color: theme.textSecondary }]}>{exam.kind === 'activity' ? 'Actividad' : 'Evaluación'} · {course?.name ?? 'Curso sin asignar'} · {formatExamDate(exam.dateIso)}</Text>
               </View>
               <View style={styles.examActions}>
                 <Text style={[styles.examDays, { color: theme.text }]}>{formatDaysUntil(daysUntil)}</Text>
@@ -187,7 +187,7 @@ export default function PlanScreen() {
         }) : (
           <KodaCard style={styles.emptyCard}>
             <Ionicons color={theme.textTertiary} name="calendar-outline" size={22} />
-            <KodaText tone="secondary">Aún no registras exámenes. Añade el primero para que KODA priorice tus sesiones.</KodaText>
+            <KodaText tone="secondary">Aún no registras evaluaciones ni actividades. Añade una evaluación para que KODA priorice tus sesiones.</KodaText>
           </KodaCard>
         )}
       </KodaReveal>

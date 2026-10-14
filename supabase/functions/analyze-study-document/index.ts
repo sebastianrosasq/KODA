@@ -53,11 +53,32 @@ const studySchema = {
   required: ['title', 'summary', 'keyPoints', 'flashcards', 'quizQuestions'],
 };
 
+const syllabusSchema = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    summary: { type: 'string' },
+    keyPoints: { type: 'array', items: { type: 'string' } },
+    flashcards: { type: 'array', items: { type: 'object', properties: { question: { type: 'string' }, answer: { type: 'string' } }, required: ['question', 'answer'] } },
+    quizQuestions: { type: 'array', items: { type: 'object', properties: { question: { type: 'string' }, options: { type: 'array', items: { type: 'string' } }, correctOption: { type: 'integer' }, explanation: { type: 'string' } }, required: ['question', 'options', 'correctOption', 'explanation'] } },
+    syllabus: {
+      type: 'object',
+      properties: {
+        units: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, topics: { type: 'array', items: { type: 'string' } } }, required: ['title', 'topics'] } },
+        calendarEvents: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, dateIso: { type: 'string' }, type: { type: 'string', enum: ['evaluation', 'activity'] } }, required: ['title', 'dateIso', 'type'] } },
+      },
+      required: ['units', 'calendarEvents'],
+    },
+  },
+  required: ['title', 'summary', 'keyPoints', 'flashcards', 'quizQuestions', 'syllabus'],
+};
+
 type StudyDocument = {
   id: string;
   storage_path: string;
   mime_type: string;
   content_kind: 'pdf' | 'audio';
+  document_role?: 'study_material' | 'syllabus';
   analysis_status: string;
   analysis: unknown;
 };
@@ -120,7 +141,32 @@ function asTextList(value: unknown, maxItems: number, maximumLength: number) {
     .slice(0, maxItems);
 }
 
-function normalizeAnalysis(value: unknown) {
+function normalizeSyllabus(value: unknown) {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = value as Record<string, unknown>;
+  const units = Array.isArray(candidate.units)
+    ? candidate.units.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const unit = item as Record<string, unknown>;
+      const title = asText(unit.title, 180);
+      const topics = asTextList(unit.topics, 12, 220);
+      return title && topics.length ? [{ title, topics }] : [];
+    }).slice(0, 12)
+    : [];
+  const calendarEvents = Array.isArray(candidate.calendarEvents)
+    ? candidate.calendarEvents.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const event = item as Record<string, unknown>;
+      const title = asText(event.title, 180);
+      const dateIso = asText(event.dateIso, 10);
+      const type = event.type === 'activity' ? 'activity' : event.type === 'evaluation' ? 'evaluation' : null;
+      return title && /^\d{4}-\d{2}-\d{2}$/.test(dateIso) && type ? [{ title, dateIso, type }] : [];
+    }).slice(0, 20)
+    : [];
+  return units.length || calendarEvents.length ? { units, calendarEvents } : undefined;
+}
+
+function normalizeAnalysis(value: unknown, role: StudyDocument['document_role']) {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
   const title = asText(candidate.title, 160);
@@ -152,7 +198,9 @@ function normalizeAnalysis(value: unknown) {
     : [];
 
   if (!title || !summary) return null;
-  return { title, summary, keyPoints, flashcards, quizQuestions };
+  const syllabus = role === 'syllabus' ? normalizeSyllabus(candidate.syllabus) : undefined;
+  if (role === 'syllabus' && !syllabus) return null;
+  return { title, summary, keyPoints, flashcards, quizQuestions, ...(syllabus ? { syllabus } : {}) };
 }
 
 function readGeminiText(payload: GeminiPayload) {
@@ -201,7 +249,7 @@ Deno.serve(async (request) => {
 
   const { data, error: documentError } = await client
     .from('student_study_documents')
-    .select('id, storage_path, mime_type, content_kind, analysis_status, analysis')
+    .select('id, storage_path, mime_type, content_kind, document_role, analysis_status, analysis')
     .eq('id', documentId)
     .maybeSingle();
   const document = data as StudyDocument | null;
@@ -228,16 +276,18 @@ Deno.serve(async (request) => {
     return json({ error: 'Solo se aceptan PDF o audios compatibles de hasta 12 MB.' }, 400);
   }
 
+  const quotaOperation = document.content_kind === 'audio' ? 'document_audio' : 'document_pdf';
+  const quotaLimit = document.content_kind === 'audio' ? 5 : 3;
   const { data: quotaData, error: quotaError } = await adminClient.rpc('consume_koda_ai_quota', {
     requested_user_id: userData.user.id,
-    requested_operation: 'document_analysis',
+    requested_operation: quotaOperation,
   });
   const quota = quotaData as { allowed?: boolean; remaining?: number } | null;
   if (quotaError) {
     console.error('No se pudo consumir la cuota de IA', quotaError.message);
     return json({ error: 'No se pudo validar tu cuota de IA.' }, 500);
   }
-  if (!quota?.allowed) return json({ error: 'Alcanzaste el límite diario de 2 documentos analizados.' }, 429);
+  if (!quota?.allowed) return json({ error: `Alcanzaste el límite diario de ${quotaLimit} ${document.content_kind === 'audio' ? 'audios' : 'PDFs'} analizados.` }, 429);
 
   await markDocument(adminClient, document.id, { analysis_status: 'processing', last_error: null });
 
@@ -254,7 +304,9 @@ Deno.serve(async (request) => {
             { inlineData: { mimeType: document.mime_type, data: toBase64(new Uint8Array(await material.arrayBuffer())) } },
             {
               text: [
-                document.content_kind === 'audio'
+                document.document_role === 'syllabus'
+                  ? 'Analiza exclusivamente este sílabo PDF. Extrae solo las unidades y temas que estén escritos. Incluye en calendarEvents únicamente evaluaciones o actividades que tengan una fecha completa y explícita en formato YYYY-MM-DD; no adivines años, fechas ni contenidos. La agenda es una propuesta que el estudiante revisará.'
+                  : document.content_kind === 'audio'
                   ? 'Analiza exclusivamente este audio de estudio para una semana de exámenes. Identifica con cautela las ideas expresadas; si una parte no es audible, no la inventes.'
                   : 'Analiza exclusivamente este PDF para una semana de exámenes.',
                 'No inventes información ni uses fuentes externas.',
@@ -267,7 +319,7 @@ Deno.serve(async (request) => {
         generationConfig: {
           maxOutputTokens: 2200,
           responseMimeType: 'application/json',
-          responseJsonSchema: studySchema,
+          responseJsonSchema: document.document_role === 'syllabus' ? syllabusSchema : studySchema,
         },
       }),
     },
@@ -287,7 +339,7 @@ Deno.serve(async (request) => {
   const outputText = readGeminiText(await geminiResponse.json() as GeminiPayload);
   let analysis = null;
   try {
-    analysis = normalizeAnalysis(JSON.parse(outputText));
+    analysis = normalizeAnalysis(JSON.parse(outputText), document.document_role);
   } catch {
     analysis = null;
   }

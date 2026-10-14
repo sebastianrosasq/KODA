@@ -1,4 +1,5 @@
 import type { DocumentPickerAsset } from 'expo-document-picker';
+import { File } from 'expo-file-system';
 
 import { supabase } from '@/lib/supabase';
 
@@ -6,6 +7,7 @@ const DOCUMENT_BUCKET = 'koda-study-documents';
 export const MAX_STUDY_MATERIAL_BYTES = 12 * 1024 * 1024;
 
 export type StudyMaterialKind = 'pdf' | 'audio';
+export type StudyDocumentRole = 'study_material' | 'syllabus';
 
 const mimeTypesByExtension: Record<string, { kind: StudyMaterialKind; mimeType: string }> = {
   pdf: { kind: 'pdf', mimeType: 'application/pdf' },
@@ -51,6 +53,10 @@ export type StudyDocumentAnalysis = {
   keyPoints: string[];
   flashcards: GeneratedFlashcard[];
   quizQuestions: GeneratedQuizQuestion[];
+  syllabus?: {
+    units: { title: string; topics: string[] }[];
+    calendarEvents: { title: string; dateIso: string; type: 'evaluation' | 'activity' }[];
+  };
 };
 
 export type StudyDocument = {
@@ -58,6 +64,7 @@ export type StudyDocument = {
   courseId: string | null;
   originalFilename: string;
   contentKind: StudyMaterialKind;
+  documentRole: StudyDocumentRole;
   analysisStatus: 'ready' | 'processing' | 'completed' | 'failed';
   analysis: StudyDocumentAnalysis | null;
   flashcardsImportedAt: string | null;
@@ -80,6 +87,7 @@ type StudyDocumentRow = {
   course_id: string | null;
   original_filename: string;
   content_kind: StudyMaterialKind;
+  document_role?: StudyDocumentRole;
   analysis_status: StudyDocument['analysisStatus'];
   analysis: unknown;
   flashcards_imported_at: string | null;
@@ -110,6 +118,33 @@ function asTextList(value: unknown, count: number, maximumLength: number) {
   return Array.isArray(value)
     ? value.map((item) => asText(item, maximumLength)).filter(Boolean).slice(0, count)
     : [];
+}
+
+function asSyllabus(value: unknown) {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = value as Record<string, unknown>;
+  const units = Array.isArray(candidate.units)
+    ? candidate.units.flatMap((unit) => {
+      if (!unit || typeof unit !== 'object') return [];
+      const unitValue = unit as Record<string, unknown>;
+      const title = asText(unitValue.title, 180);
+      const topics = asTextList(unitValue.topics, 12, 220);
+      return title && topics.length ? [{ title, topics }] : [];
+    }).slice(0, 12)
+    : [];
+  const calendarEvents: { title: string; dateIso: string; type: 'evaluation' | 'activity' }[] = Array.isArray(candidate.calendarEvents)
+    ? candidate.calendarEvents.flatMap<{ title: string; dateIso: string; type: 'evaluation' | 'activity' }>((event) => {
+      if (!event || typeof event !== 'object') return [];
+      const eventValue = event as Record<string, unknown>;
+      const title = asText(eventValue.title, 180);
+      const dateIso = asText(eventValue.dateIso, 10);
+      const type = eventValue.type === 'activity' ? 'activity' : eventValue.type === 'evaluation' ? 'evaluation' : null;
+      return title && /^\d{4}-\d{2}-\d{2}$/.test(dateIso) && type
+        ? [{ title, dateIso, type }]
+        : [];
+    }).slice(0, 20)
+    : [];
+  return units.length || calendarEvents.length ? { units, calendarEvents } : undefined;
 }
 
 export function asStudyDocumentAnalysis(value: unknown): StudyDocumentAnalysis | null {
@@ -150,6 +185,7 @@ export function asStudyDocumentAnalysis(value: unknown): StudyDocumentAnalysis |
     keyPoints: asTextList(candidate.keyPoints, 8, 320),
     flashcards,
     quizQuestions,
+    syllabus: asSyllabus(candidate.syllabus),
   };
 }
 
@@ -162,6 +198,7 @@ function mapDocument(row: StudyDocumentRow, courseKeyById: Map<string, string>):
     courseId: row.course_id ? courseKeyById.get(row.course_id) ?? null : null,
     originalFilename: row.original_filename,
     contentKind: row.content_kind,
+    documentRole: row.document_role === 'syllabus' ? 'syllabus' : 'study_material',
     analysisStatus: row.analysis_status,
     analysis: asStudyDocumentAnalysis(row.analysis),
     flashcardsImportedAt: row.flashcards_imported_at,
@@ -197,16 +234,10 @@ async function getDatabaseCourseId(clientCourseId: string) {
   return databaseCourseId;
 }
 
-async function readAsset(asset: DocumentPickerAsset, mimeType: string) {
-  if (asset.file) {
-    return new Blob([await asset.file.arrayBuffer()], { type: mimeType });
-  }
-  const response = await fetch(asset.uri);
-  if (!response.ok) throw new Error('No se pudo abrir el material elegido.');
-  // Algunos selectores Android etiquetan archivos válidos como text/plain.
-  // Se conserva el contenido, pero se corrige el tipo con la extensión validada
-  // antes de enviarlo a Storage y a Gemini.
-  return new Blob([await response.arrayBuffer()], { type: mimeType });
+function readAsset(asset: DocumentPickerAsset) {
+  // En Android/Hermes Blob no admite ArrayBuffer como parte. Expo File implementa
+  // Blob directamente y transmite el binario sin convertirlo a memoria de JS.
+  return asset.file ?? new File(asset.uri);
 }
 
 function getAssetDescriptor(asset: DocumentPickerAsset) {
@@ -258,7 +289,7 @@ export async function listStudyDocuments() {
   const [{ data, error }, { clientKeyByDatabaseId }] = await Promise.all([
     client
       .from('student_study_documents')
-      .select('id, course_id, original_filename, content_kind, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
+      .select('id, course_id, original_filename, content_kind, document_role, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
       .order('created_at', { ascending: false }),
     getCourseReferences(),
   ]);
@@ -290,14 +321,15 @@ export async function recordAiDocumentConsent() {
   if (error) throw new Error(error.message);
 }
 
-export async function uploadStudyDocument({ asset, courseId }: { asset: DocumentPickerAsset; courseId: string }) {
+export async function uploadStudyDocument({ asset, courseId, role = 'study_material' }: { asset: DocumentPickerAsset; courseId: string; role?: StudyDocumentRole }) {
   const client = clientOrThrow();
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError || !userData.user) throw new Error('Inicia sesión para guardar un material.');
   const descriptor = getAssetDescriptor(asset);
+  if (role === 'syllabus' && descriptor.kind !== 'pdf') throw new Error('El sílabo debe subirse como PDF.');
   const databaseCourseId = await getDatabaseCourseId(courseId);
 
-  const file = await readAsset(asset, descriptor.mimeType);
+  const file = readAsset(asset);
   if (!file.size || file.size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
 
   const storagePath = createStoragePath(userData.user.id, descriptor.extension);
@@ -310,6 +342,7 @@ export async function uploadStudyDocument({ asset, courseId }: { asset: Document
       original_filename: asset.name.slice(0, 180),
       mime_type: descriptor.mimeType,
       content_kind: descriptor.kind,
+      document_role: role,
       byte_size: file.size,
     })
     .select('id')

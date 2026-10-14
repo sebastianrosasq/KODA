@@ -36,6 +36,7 @@ type RemoteExam = {
   title: string;
   scheduled_at: string;
   difficulty: number;
+  event_kind?: 'assessment' | 'activity';
 };
 
 type RemoteTopic = {
@@ -273,6 +274,7 @@ export async function syncWorkspaceToSupabase(userId: string, workspace: KodaWor
           title: exam.title,
           scheduled_at: `${exam.dateIso}T12:00:00.000Z`,
           difficulty: exam.difficulty,
+          event_kind: exam.kind ?? 'assessment',
         }] : [];
       }),
       { onConflict: 'course_id,client_key' },
@@ -416,7 +418,7 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
   if (!courseIds.length) return { ...fallback, profile: remoteProfile, courses: [], exams: [], topics: [], flashcards: [], availability: [], completedSessionIds: [] };
 
   const [{ data: examRows, error: examError }, { data: topicRows, error: topicError }, { data: flashcardRows, error: flashcardError }, { data: availabilityRows, error: availabilityError }, { data: sessionRows, error: sessionError }] = await Promise.all([
-    client.from('student_exams').select('id, client_key, course_id, title, scheduled_at, difficulty').in('course_id', courseIds),
+    client.from('student_exams').select('id, client_key, course_id, title, scheduled_at, difficulty, event_kind').in('course_id', courseIds),
     client.from('student_topics').select('id, client_key, course_id, name, priority, completed_at').in('course_id', courseIds),
     client.from('student_flashcards').select('id, client_key, course_id, prompt, answer, mastery, last_reviewed_at').in('course_id', courseIds),
     client.from('student_availability_blocks').select('id, client_key, weekday, starts_at, duration_minutes').eq('profile_id', profile.id),
@@ -447,6 +449,7 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
         title: exam.title,
         dateIso: apiDateToIso(exam.scheduled_at),
         difficulty: asDifficulty(exam.difficulty),
+        kind: exam.event_kind === 'activity' ? 'activity' : 'assessment',
       }] : [];
     }),
     topics: ((topicRows ?? []) as RemoteTopic[]).flatMap((topic) => {

@@ -24,6 +24,7 @@ export const catalogInstitutions: CatalogInstitution[] = [
   { slug: 'ucsm', name: 'Universidad Católica de Santa María', status: 'verified' },
   { slug: 'ucsp', name: 'Universidad Católica San Pablo', status: 'source_identified' },
   { slug: 'unsa', name: 'Universidad Nacional de San Agustín de Arequipa', status: 'source_identified' },
+  { slug: 'continental', name: 'Universidad Continental', status: 'verified' },
   { slug: 'idat', name: 'Instituto IDAT', status: 'verified' },
   { slug: 'certus', name: 'CERTUS', status: 'source_identified' },
   { slug: 'isil', name: 'ISIL', status: 'source_identified' },
@@ -33,7 +34,6 @@ export const catalogInstitutions: CatalogInstitution[] = [
   { slug: 'upc', name: 'Universidad Peruana de Ciencias Aplicadas', status: 'source_identified' },
   { slug: 'pucp', name: 'Pontificia Universidad Católica del Perú', status: 'source_identified' },
   { slug: 'unmsm', name: 'Universidad Nacional Mayor de San Marcos', status: 'source_identified' },
-  { slug: 'ucv', name: 'Universidad César Vallejo', status: 'verified' },
   { slug: 'upn', name: 'Universidad Privada del Norte', status: 'verified' },
 ];
 
@@ -42,6 +42,7 @@ export const catalogPrograms: CatalogProgram[] = [
   { institutionSlug: 'ucsm', slug: 'ingenieria-sistemas', name: 'Ingeniería de Sistemas', termLabel: 'Semestre', termCount: 10, status: 'verified' },
   { institutionSlug: 'ucsp', slug: 'ciencia-computacion', name: 'Ciencia de la Computación', termLabel: 'Semestre', termCount: 10, status: 'source_identified' },
   { institutionSlug: 'unsa', slug: 'ingenieria-sistemas', name: 'Ingeniería de Sistemas', termLabel: 'Semestre', termCount: 10, status: 'source_identified' },
+  { institutionSlug: 'continental', slug: 'ingenieria-sistemas-informatica', name: 'Ingeniería de Sistemas e Informática', termLabel: 'Ciclo', termCount: 10, status: 'verified' },
   { institutionSlug: 'idat', slug: 'tecnico-programacion-software', name: 'Técnico en Programación de Software', termLabel: 'Ciclo', termCount: 4, status: 'verified' },
   { institutionSlug: 'certus', slug: 'diseno-desarrollo-software', name: 'Diseño y Desarrollo de Software', termLabel: 'Ciclo', termCount: 6, status: 'source_identified' },
   { institutionSlug: 'isil', slug: 'desarrollo-sistemas-informacion', name: 'Desarrollo de Sistemas de Información', termLabel: 'Ciclo', termCount: 6, status: 'source_identified' },
@@ -52,7 +53,6 @@ export const catalogPrograms: CatalogProgram[] = [
   { institutionSlug: 'upc', slug: 'ingenieria-software', name: 'Ingeniería de Software', termLabel: 'Ciclo', termCount: 10, status: 'source_identified' },
   { institutionSlug: 'pucp', slug: 'ingenieria-informatica', name: 'Ingeniería Informática', termLabel: 'Semestre', termCount: 10, status: 'source_identified' },
   { institutionSlug: 'unmsm', slug: 'ingenieria-sistemas', name: 'Ingeniería de Sistemas', termLabel: 'Ciclo', termCount: 10, status: 'source_identified' },
-  { institutionSlug: 'ucv', slug: 'ingenieria-sistemas', name: 'Ingeniería de Sistemas', termLabel: 'Ciclo', termCount: 10, status: 'verified' },
   { institutionSlug: 'upn', slug: 'ingenieria-sistemas-computacionales', name: 'Ingeniería de Sistemas Computacionales', termLabel: 'Ciclo', termCount: 10, status: 'verified' },
 ];
 
@@ -65,6 +65,9 @@ const offlineSuggestions: Record<string, Record<number, string[]>> = {
   },
   'idat/tecnico-programacion-software': {
     4: ['Desarrollo de los Componentes del Negocio', 'Desarrollo de Interfaces 3', 'Patrones de Diseño de Software', 'Innovación Centrada en Personas'],
+  },
+  'continental/ingenieria-sistemas-informatica': {
+    1: ['Comprensión y Producción de Textos 1', 'Laboratorio de Liderazgo e Innovación', 'Estrategias y Herramientas Digitales para el Aprendizaje', 'Matemática Básica', 'Matemática Discreta 1', 'Técnicas de Programación', 'Introducción a la Ingeniería de Sistemas e Informática'],
   },
 };
 

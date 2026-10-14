@@ -8,7 +8,6 @@ import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import {
   askStudyCoach,
   clearStudyCoachMessages,
-  getStudyCoachRemainingMessages,
   listStudyCoachMessages,
   type StudyCoachMessage,
 } from '@/features/ai/study-coach';
@@ -54,7 +53,6 @@ export default function CoachScreen() {
   const [isClearingHistory, setClearingHistory] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<CoachMessage[]>([welcomeMessage]);
-  const [remainingMessages, setRemainingMessages] = useState<number | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
 
   const analyzedDocuments = useMemo(
@@ -65,16 +63,14 @@ export default function CoachScreen() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [nextDocuments, consent, previousMessages, quota] = await Promise.all([
+      const [nextDocuments, consent, previousMessages] = await Promise.all([
         listStudyDocuments(),
         getAiDocumentConsent(),
         listStudyCoachMessages(),
-        getStudyCoachRemainingMessages(),
       ]);
       setDocuments(nextDocuments);
       setHasConsent(consent);
       setMessages(previousMessages.length ? previousMessages : [welcomeMessage]);
-      setRemainingMessages(quota);
       setSelectedDocumentId((current) => initialDocumentId || current || nextDocuments.find((document) => document.analysisStatus === 'completed')?.id || '');
     } catch (error) {
       console.warn('No se pudo cargar el contexto para KODA IA', error);
@@ -117,7 +113,6 @@ export default function CoachScreen() {
       setSending(true);
       const reply = await askStudyCoach({ message, documentId: selectedDocumentId || undefined });
       setMessages((current) => [...current, { id: `assistant-${Date.now()}`, role: 'assistant', text: reply.answer }]);
-      setRemainingMessages(reply.remainingMessages);
       if (!reply.historySaved) {
         setRequestError('La respuesta llegó, pero no se pudo guardar en tu historial. Intenta recargar antes de salir.');
       }
@@ -243,7 +238,7 @@ export default function CoachScreen() {
           value={prompt}
         />
         <View style={styles.composerFooter}>
-          <Text style={[styles.quota, { color: theme.textTertiary }]}>{hasConsent ? (isLoading ? 'Revisando tu límite diario…' : remainingMessages === null ? 'Límite diario: 8 mensajes de IA.' : `${remainingMessages} mensajes de IA restantes hoy`) : isLoading ? 'Cargando tu chat…' : 'Acepta el aviso de IA para activar el chat.'}</Text>
+          <Text style={[styles.quota, { color: theme.textTertiary }]}>{hasConsent ? (isLoading ? 'Preparando tu chat…' : 'KODA IA está lista para ayudarte.') : isLoading ? 'Cargando tu chat…' : 'Acepta el aviso de IA para activar el chat.'}</Text>
           <KodaButton disabled={isSending || !prompt.trim() || !hasConsent} icon="send-outline" label={isSending ? 'Enviando…' : 'Enviar'} onPress={() => void submit()} />
         </View>
       </KodaCard>

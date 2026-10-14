@@ -9,7 +9,7 @@ function daysUntil(dateIso: string) {
 
 function getExamForCourse(exams: StudentExam[], courseId: string) {
   return exams
-    .filter((exam) => exam.courseId === courseId)
+    .filter((exam) => exam.courseId === courseId && exam.kind !== 'activity')
     .sort((left, right) => left.dateIso.localeCompare(right.dateIso))[0];
 }
 

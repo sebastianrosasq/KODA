@@ -153,11 +153,17 @@ type KodaDataContextValue = {
   plan: ReturnType<typeof generateStudyPlan>;
   updateProfile: (profile: StudentAcademicProfile) => void;
   completeAcademicProfile: (profile: StudentAcademicProfile, courseNames: string[]) => void;
+  replaceAcademicCourses: (profile: StudentAcademicProfile, courseNames: string[]) => void;
   addCourse: (name: string) => void;
   preloadCourses: (names: string[]) => void;
   removeCourse: (courseId: string) => void;
   setCourseActive: (courseId: string, isActive: boolean) => void;
   addExam: (exam: Omit<StudentExam, 'id'>) => void;
+  applySyllabusProposal: (input: {
+    courseId: string;
+    units: { title: string; topics: string[] }[];
+    calendarEvents: { title: string; dateIso: string; type: 'evaluation' | 'activity' }[];
+  }) => void;
   removeExam: (examId: string) => void;
   addTopic: (topic: Omit<StudyTopic, 'id' | 'completed'>) => void;
   toggleTopic: (topicId: string) => void;
@@ -307,7 +313,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     updateWorkspace((current) => ({ ...current, profile }));
   }, [updateWorkspace]);
 
-  const completeAcademicProfile = useCallback((profile: StudentAcademicProfile, courseNames: string[]) => {
+  const replaceAcademicCourses = useCallback((profile: StudentAcademicProfile, courseNames: string[]) => {
     updateWorkspace((current) => ({
       ...current,
       academicProfileCompleted: true,
@@ -320,8 +326,16 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
         wasPreloaded: true,
         tone: tones[index % tones.length],
       })),
+      // Una malla representa un ciclo concreto. Al cambiarlo no pueden quedar
+      // evaluaciones, temas ni tarjetas de la malla anterior mezclados con la nueva.
+      exams: [],
+      topics: [],
+      flashcards: [],
+      completedSessionIds: [],
     }));
   }, [updateWorkspace]);
+
+  const completeAcademicProfile = replaceAcademicCourses;
 
   const addCourse = useCallback((name: string) => {
     const normalizedName = name.trim();
@@ -379,6 +393,41 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
 
   const addExam = useCallback((exam: Omit<StudentExam, 'id'>) => {
     updateWorkspace((current) => ({ ...current, exams: [...current.exams, { ...exam, id: createId('exam') }] }));
+  }, [updateWorkspace]);
+
+  const applySyllabusProposal = useCallback((input: {
+    courseId: string;
+    units: { title: string; topics: string[] }[];
+    calendarEvents: { title: string; dateIso: string; type: 'evaluation' | 'activity' }[];
+  }) => {
+    updateWorkspace((current) => {
+      const existingTopicNames = new Set(
+        current.topics
+          .filter((topic) => topic.courseId === input.courseId)
+          .map((topic) => topic.name.trim().toLocaleLowerCase()),
+      );
+      const existingEvents = new Set(
+        current.exams
+          .filter((event) => event.courseId === input.courseId)
+          .map((event) => `${event.title.trim().toLocaleLowerCase()}|${event.dateIso}|${event.kind ?? 'assessment'}`),
+      );
+      const topics = input.units.flatMap((unit) => unit.topics)
+        .map((name) => name.trim())
+        .filter((name) => name && !existingTopicNames.has(name.toLocaleLowerCase()))
+        .map((name) => ({ id: createId('topic'), courseId: input.courseId, name, priority: 2 as const, completed: false }));
+      const events = input.calendarEvents
+        .filter((event) => /^\d{4}-\d{2}-\d{2}$/.test(event.dateIso))
+        .filter((event) => !existingEvents.has(`${event.title.trim().toLocaleLowerCase()}|${event.dateIso}|${event.type === 'activity' ? 'activity' : 'assessment'}`))
+        .map((event) => ({
+          id: createId('exam'),
+          courseId: input.courseId,
+          title: event.title.trim(),
+          dateIso: event.dateIso,
+          difficulty: event.type === 'evaluation' ? 3 as const : 1 as const,
+          kind: event.type === 'activity' ? 'activity' as const : 'assessment' as const,
+        }));
+      return { ...current, topics: [...current.topics, ...topics], exams: [...current.exams, ...events] };
+    });
   }, [updateWorkspace]);
 
   const removeExam = useCallback((examId: string) => {
@@ -501,11 +550,13 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       plan,
       updateProfile,
       completeAcademicProfile,
+      replaceAcademicCourses,
       addCourse,
       preloadCourses,
       removeCourse,
       setCourseActive,
       addExam,
+      applySyllabusProposal,
       removeExam,
       addTopic,
       addFlashcard,
@@ -520,6 +571,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     [
       addCourse,
       addExam,
+      applySyllabusProposal,
       removeExam,
       addTopic,
       addFlashcard,
@@ -537,6 +589,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       toggleTopic,
       updateAvailability,
       completeAcademicProfile,
+      replaceAcademicCourses,
       updateProfile,
       workspace,
       syncError,

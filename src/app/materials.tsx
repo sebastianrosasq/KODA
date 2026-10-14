@@ -12,6 +12,7 @@ import {
   markDocumentFlashcardsImported,
   recordAiDocumentConsent,
   type StudyDocument,
+  type StudyDocumentRole,
   uploadStudyDocument,
 } from '@/features/ai/study-documents';
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaScreen, KodaSectionTitle } from '@/components/koda-ui';
@@ -23,7 +24,7 @@ import { useKodaTheme } from '@/providers/koda-theme-provider';
 export default function MaterialsScreen() {
   const { theme } = useKodaTheme();
   const { status } = useKodaAuth();
-  const { addFlashcard, workspace } = useKodaData();
+  const { addFlashcard, applySyllabusProposal, workspace } = useKodaData();
   const courses = useMemo(() => workspace.courses.filter((course) => course.isActive), [workspace.courses]);
   const [courseId, setCourseId] = useState('');
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
@@ -34,6 +35,7 @@ export default function MaterialsScreen() {
   const [importingId, setImportingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [uploadRole, setUploadRole] = useState<StudyDocumentRole>('study_material');
   const selectedCourseId = courses.some((course) => course.id === courseId) ? courseId : courses[0]?.id ?? '';
 
   const loadDocuments = useCallback(async () => {
@@ -81,18 +83,20 @@ export default function MaterialsScreen() {
     }
 
     const result = await DocumentPicker.getDocumentAsync({
-      type: [
-        'application/pdf',
-        'audio/mpeg',
-        'audio/mp3',
-        'audio/wav',
-        'audio/aac',
-        'audio/ogg',
-        'audio/flac',
-        'audio/webm',
-        'audio/m4a',
-        'audio/mp4',
-      ],
+      type: uploadRole === 'syllabus'
+        ? 'application/pdf'
+        : [
+          'application/pdf',
+          'audio/mpeg',
+          'audio/mp3',
+          'audio/wav',
+          'audio/aac',
+          'audio/ogg',
+          'audio/flac',
+          'audio/webm',
+          'audio/m4a',
+          'audio/mp4',
+        ],
       copyToCacheDirectory: true,
       multiple: false,
     });
@@ -101,17 +105,21 @@ export default function MaterialsScreen() {
     try {
       setLoading(true);
       setFeedback(null);
-      const { documentId } = await uploadStudyDocument({ asset: result.assets[0], courseId: selectedCourseId });
+      const { documentId } = await uploadStudyDocument({ asset: result.assets[0], courseId: selectedCourseId, role: uploadRole });
       await loadDocuments();
       if (!hasConsent) {
-        setFeedback('Material guardado. Acepta el uso de IA cuando quieras convertirlo en resumen, tarjetas y práctica.');
+        setFeedback(uploadRole === 'syllabus'
+          ? 'Sílabo guardado. Acepta el uso de IA para extraer unidades, fechas y una agenda propuesta.'
+          : 'Material guardado. Acepta el uso de IA cuando quieras convertirlo en resumen, tarjetas y práctica.');
         return;
       }
 
       try {
         await analyzeStudyDocument(documentId);
         await loadDocuments();
-        setFeedback('Análisis listo. Revisa el resumen, guarda las tarjetas que quieras y practica.');
+        setFeedback(uploadRole === 'syllabus'
+          ? 'Sílabo analizado. Revisa la agenda sugerida y decide si quieres aplicarla.'
+          : 'Análisis listo. Revisa el resumen, guarda las tarjetas que quieras y practica.');
       } catch (error) {
         await loadDocuments();
         setFeedback(`Tu material se guardó. ${error instanceof Error ? error.message : 'El análisis podrá reintentarse más tarde.'}`);
@@ -178,6 +186,25 @@ export default function MaterialsScreen() {
     ]);
   };
 
+  const applySyllabus = (document: StudyDocument) => {
+    if (!document.courseId || !document.analysis?.syllabus) return;
+    const proposal = document.analysis.syllabus;
+    Alert.alert(
+      '¿Aplicar agenda sugerida?',
+      `Se añadirán ${proposal.units.flatMap((unit) => unit.topics).length} temas y ${proposal.calendarEvents.length} fechas a este curso. Puedes borrar o editar cualquier evento después.`,
+      [
+        { text: 'Revisar después', style: 'cancel' },
+        {
+          text: 'Aplicar calendario',
+          onPress: () => {
+            applySyllabusProposal({ courseId: document.courseId!, ...proposal });
+            setFeedback('La agenda del sílabo se añadió a tu plan. Revisa las fechas antes de estudiar.');
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <KodaScreen>
       <KodaPageHeader
@@ -223,12 +250,16 @@ export default function MaterialsScreen() {
       ) : null}
 
       <View style={styles.sectionBlock}>
-        <KodaSectionTitle title="Guardar un PDF o audio" />
+        <KodaSectionTitle title={uploadRole === 'syllabus' ? 'Subir sílabo del curso' : 'Guardar un PDF o audio'} />
+        <View style={styles.pills}>
+          <KodaPill label="Material de estudio" selected={uploadRole === 'study_material'} onPress={() => setUploadRole('study_material')} />
+          <KodaPill label="Sílabo (PDF)" selected={uploadRole === 'syllabus'} onPress={() => setUploadRole('syllabus')} />
+        </View>
         <View style={styles.pills}>
           {courses.map((course) => <KodaPill key={course.id} label={course.name} selected={course.id === selectedCourseId} onPress={() => setCourseId(course.id)} />)}
         </View>
-        <KodaButton disabled={isLoading || status !== 'signed_in' || !selectedCourseId} icon="cloud-upload-outline" label={isLoading ? 'Guardando tu material…' : 'Elegir PDF o audio · hasta 12 MB'} onPress={() => void chooseAndUpload()} />
-        <Text style={[styles.limitText, { color: theme.textTertiary }]}>Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Al aceptar IA tendrás hasta 2 análisis diarios.</Text>
+        <KodaButton disabled={isLoading || status !== 'signed_in' || !selectedCourseId} icon="cloud-upload-outline" label={isLoading ? 'Guardando…' : uploadRole === 'syllabus' ? 'Elegir sílabo PDF · hasta 12 MB' : 'Elegir PDF o audio · hasta 12 MB'} onPress={() => void chooseAndUpload()} />
+        <Text style={[styles.limitText, { color: theme.textTertiary }]}>{uploadRole === 'syllabus' ? 'KODA identifica unidades, temas, evaluaciones y actividades. Tú decides si aplicas su agenda.' : 'Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Límite diario de IA: 3 PDFs y 5 audios.'}</Text>
         {feedback ? <Text style={[styles.feedbackText, { color: theme.textSecondary }]}>{feedback}</Text> : null}
       </View>
 
@@ -252,7 +283,7 @@ export default function MaterialsScreen() {
                 </View>
                 <View style={styles.documentCopy}>
                   <Text numberOfLines={1} style={[styles.documentName, { color: theme.text }]}>{document.analysis?.title ?? document.originalFilename}</Text>
-                  <Text style={[styles.documentMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Material de estudio'} · {document.contentKind === 'audio' ? 'audio' : 'PDF'} · {statusLabel(document.analysisStatus)}</Text>
+                  <Text style={[styles.documentMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Material de estudio'} · {document.documentRole === 'syllabus' ? 'sílabo PDF' : document.contentKind === 'audio' ? 'audio' : 'PDF'} · {statusLabel(document.analysisStatus)}</Text>
                 </View>
                 <KodaIconButton icon="trash-outline" label={'Eliminar ' + document.originalFilename} onPress={() => removeDocument(document)} />
               </View>
@@ -260,6 +291,13 @@ export default function MaterialsScreen() {
               {document.analysis ? (
                 <View style={styles.analysisContent}>
                   <Text style={[styles.summary, { color: theme.textSecondary }]}>{document.analysis.summary}</Text>
+                  {document.documentRole === 'syllabus' && document.analysis.syllabus ? (
+                    <View style={[styles.syllabusCard, { backgroundColor: theme.accentSoft }] }>
+                      <Text style={[styles.syllabusTitle, { color: theme.text }]}>Agenda propuesta por tu sílabo</Text>
+                      <Text style={[styles.syllabusDetail, { color: theme.textSecondary }]}>{document.analysis.syllabus.units.length} unidades/temas detectados · {document.analysis.syllabus.calendarEvents.length} fechas verificables</Text>
+                      <KodaButton icon="calendar-outline" label="Aplicar al plan" onPress={() => applySyllabus(document)} variant="secondary" style={styles.actionButton} />
+                    </View>
+                  ) : null}
                   {document.analysis.keyPoints.length ? (
                     <View style={styles.keyPointList}>
                       {document.analysis.keyPoints.map((point) => (
@@ -364,6 +402,9 @@ const styles = StyleSheet.create({
   documentActions: { gap: KodaSpacing.sm },
   actionButton: { width: '100%' },
   failureText: { fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  syllabusCard: { borderRadius: KodaRadius.md, gap: KodaSpacing.sm, padding: KodaSpacing.md },
+  syllabusTitle: { fontSize: 13, fontWeight: '900' },
+  syllabusDetail: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
   emptyCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
   emptyCopy: { flex: 1, gap: 2 },
   emptyTitle: { fontSize: 14, fontWeight: '900' },

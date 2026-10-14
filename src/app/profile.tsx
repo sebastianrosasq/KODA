@@ -209,6 +209,17 @@ export default function ProfileScreen() {
         </KodaCard>
       </KodaReveal>
 
+      <KodaReveal delay={158} style={styles.sectionBlock}>
+        <KodaSectionTitle title="KODA Plus" />
+        <KodaCard style={styles.membershipCard}>
+          <View style={styles.membershipCopy}>
+            <Text style={[styles.preferenceTitle, { color: theme.text }]}>Funciones avanzadas, sin cobros todavía</Text>
+            <Text style={[styles.preferenceText, { color: theme.textSecondary }]}>Conoce la propuesta de suscripción y qué se desbloquearía cuando el sistema de pago esté listo.</Text>
+          </View>
+          <KodaButton icon="sparkles-outline" label="Ver propuesta" onPress={() => router.push('/membership' as never)} style={styles.membershipButton} variant="secondary" />
+        </KodaCard>
+      </KodaReveal>
+
       <KodaReveal delay={180} style={styles.sectionBlock}>
         <KodaSectionTitle title="Cuenta y privacidad" />
         <KodaCard style={styles.accountCard}>
@@ -305,7 +316,7 @@ export default function ProfileScreen() {
 function AcademicProfileModal({ onClose }: { onClose: () => void }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
-  const { workspace, preloadCourses, updateProfile } = useKodaData();
+  const { workspace, replaceAcademicCourses } = useKodaData();
   const institutionSlug = workspace.profile.institutionSlug;
   const programs = useMemo(() => getProgramsForInstitution(institutionSlug), [institutionSlug]);
   const [programSlug, setProgramSlug] = useState(workspace.profile.programSlug);
@@ -317,14 +328,24 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
     if (!selectedProgram) return;
     setSaving(true);
     try {
-      updateProfile({
+      const selectionChanged = selectedProgram.slug !== workspace.profile.programSlug
+        || term !== workspace.profile.currentTerm;
+      if (!selectionChanged) {
+        onClose();
+        return;
+      }
+      const nextProfile = {
         ...workspace.profile,
         programSlug: selectedProgram.slug,
         programName: selectedProgram.name,
         currentTerm: term,
-      });
+      };
       const suggestedCourses = await getSuggestedCourses(institutionSlug, selectedProgram.slug, term);
-      preloadCourses(suggestedCourses);
+      if (!suggestedCourses.length) {
+        Alert.alert('Malla no disponible', 'Todavía no hay cursos verificados para esta carrera y ciclo. Tus cursos actuales no se modificaron.');
+        return;
+      }
+      replaceAcademicCourses(nextProfile, suggestedCourses);
       onClose();
     } finally {
       setSaving(false);
@@ -368,7 +389,8 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
                 <KodaPill key={number} label={String(number)} onPress={() => setTerm(number)} selected={number === term} />
               ))}
             </View>
-            <KodaButton disabled={isSaving} label={isSaving ? 'Consultando malla…' : 'Guardar y sugerir cursos'} icon="sparkles-outline" onPress={() => void saveProfile()} />
+            <Text style={[styles.catalogNoticeText, { color: theme.textTertiary }]}>Al guardar, KODA reemplazará los cursos, evaluaciones y tarjetas del ciclo anterior por la malla elegida.</Text>
+            <KodaButton disabled={isSaving} label={isSaving ? 'Consultando malla…' : 'Aplicar nueva malla'} icon="sparkles-outline" onPress={() => void saveProfile()} />
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -395,6 +417,9 @@ const styles = StyleSheet.create({
   addCourseCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.sm },
   courseInput: { flex: 1, fontSize: 15, fontWeight: '600', minHeight: 44, paddingHorizontal: KodaSpacing.sm },
   preferenceCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  membershipCard: { gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  membershipCopy: { gap: 3 },
+  membershipButton: { alignSelf: 'flex-start' },
   preferenceIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },
   preferenceCopy: { flex: 1, gap: 2 },
   preferenceTitle: { fontSize: 14, fontWeight: '900' },

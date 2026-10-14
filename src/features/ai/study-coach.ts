@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase';
 
 export type StudyCoachReply = {
   answer: string;
-  remainingMessages: number;
   historySaved: boolean;
 };
 
@@ -26,22 +25,9 @@ type StudyCoachMessageRow = {
   created_at: string;
 };
 
-const DAILY_MESSAGE_LIMIT = 8;
-
 function clientOrThrow() {
   if (!supabase) throw new Error('Supabase no está configurado en esta instalación.');
   return supabase;
-}
-
-function limaCalendarDay(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Lima',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
 }
 
 export async function listStudyCoachMessages() {
@@ -60,23 +46,6 @@ export async function listStudyCoachMessages() {
       text: message.content,
       createdAt: message.created_at,
     })) satisfies StudyCoachMessage[];
-}
-
-export async function getStudyCoachRemainingMessages() {
-  const client = clientOrThrow();
-  const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError || !userData.user) throw new Error('Inicia sesión para revisar tu cuota de IA.');
-
-  const { data, error } = await client
-    .from('student_ai_daily_quotas')
-    .select('coach_messages_used')
-    .eq('user_id', userData.user.id)
-    .eq('quota_day', limaCalendarDay())
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-
-  const used = typeof data?.coach_messages_used === 'number' ? data.coach_messages_used : 0;
-  return Math.max(0, DAILY_MESSAGE_LIMIT - Math.min(DAILY_MESSAGE_LIMIT, used));
 }
 
 export async function clearStudyCoachMessages() {
@@ -104,13 +73,12 @@ export async function askStudyCoach(input: { message: string; documentId?: strin
     throw new Error(friendlyMessage || 'No se pudo recibir una respuesta de KODA.');
   }
 
-  const result = data as { answer?: unknown; remainingMessages?: unknown; historySaved?: unknown } | null;
+  const result = data as { answer?: unknown; historySaved?: unknown } | null;
   if (!result || typeof result.answer !== 'string' || !result.answer.trim()) {
     throw new Error('KODA no devolvió una respuesta utilizable.');
   }
   return {
     answer: result.answer.trim().slice(0, 2400),
-    remainingMessages: typeof result.remainingMessages === 'number' ? Math.max(0, result.remainingMessages) : 0,
     historySaved: result.historySaved !== false,
   } satisfies StudyCoachReply;
 }

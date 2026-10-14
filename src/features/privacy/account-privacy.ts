@@ -139,7 +139,7 @@ export async function exportKodaPersonalData() {
     readQuery(
       client
         .from('student_study_documents')
-        .select('id, course_id, original_filename, content_kind, mime_type, byte_size, analysis_status, analysis, flashcards_imported_at, analysis_completed_at, last_error, created_at, updated_at')
+        .select('id, course_id, original_filename, content_kind, document_role, mime_type, byte_size, analysis_status, analysis, flashcards_imported_at, analysis_completed_at, last_error, created_at, updated_at')
         .eq('user_id', user.id),
       'los datos de tus materiales',
     ),
@@ -155,7 +155,7 @@ export async function exportKodaPersonalData() {
     readQuery(
       client
         .from('student_ai_daily_quotas')
-        .select('quota_day, document_analyses_used, coach_messages_used, updated_at')
+        .select('quota_day, document_analyses_used, coach_messages_used, pdf_analyses_used, audio_analyses_used, updated_at')
         .eq('user_id', user.id)
         .order('quota_day', { ascending: true }),
       'tu uso de IA',

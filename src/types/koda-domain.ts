@@ -24,6 +24,7 @@ export type StudentExam = {
   dateIso: string;
   title: string;
   difficulty: 1 | 2 | 3;
+  kind?: 'assessment' | 'activity';
 };
 
 export type StudyTopic = {

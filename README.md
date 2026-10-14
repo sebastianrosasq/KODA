@@ -11,7 +11,7 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Fundación y diseño | Listo | Expo Router, TypeScript, diseño claro/oscuro y componentes reutilizables. |
 | Cuenta y datos | Listo | Correo, sesión segura, RLS y sincronización; Google funciona cuando el proveedor está habilitado en el entorno correspondiente. |
 | Organización | Listo | Cursos, exámenes, temas, disponibilidad y un plan explicable. |
-| Catálogo curricular | En crecimiento | 15 instituciones indexadas; 7 planes verificados, 380 cursos y registro inicial solo con mallas completas. |
+| Catálogo curricular | En crecimiento | Instituciones indexadas, mallas oficiales contrastadas y registro inicial solo con ciclos completos; Continental se incorpora con su plan oficial. |
 | Calendario académico | En crecimiento | 9 periodos 2026 con 34 eventos oficiales de matrícula, clases y evaluaciones. |
 | Repaso | Listo | Flashcards propias por curso y dominio acumulado. |
 | Seguimiento | Listo | Avance por curso, riesgos próximos y recordatorios locales semanales. |
@@ -110,6 +110,7 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 - [Detalle técnico de Sprints 2 y 3](docs/SPRINT_2_3.md)
 - [Acceso con correo y Google](docs/AUTH_SETUP.md)
 - [Base segura de IA, audios, PDFs y chat](docs/AI_SETUP.md)
+- [Modelo freemium, hipótesis de precio y arquitectura de cobro](docs/MONETIZATION.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
 - [Política de privacidad para publicación](docs/PRIVACY.md)
 - [Condiciones de uso para publicación](docs/TERMS.md)

@@ -198,17 +198,6 @@ Deno.serve(async (request) => {
     recentHistory = historyReadError ? '' : formatRecentHistory((historyData ?? []) as CoachHistoryRow[]);
   }
 
-  const { data: quotaData, error: quotaError } = await adminClient.rpc('consume_koda_ai_quota', {
-    requested_user_id: userData.user.id,
-    requested_operation: 'study_coach',
-  });
-  const quota = quotaData as { allowed?: boolean; remaining?: number } | null;
-  if (quotaError) {
-    console.error('No se pudo consumir la cuota del asistente', quotaError.message);
-    return json({ error: 'No se pudo validar tu cuota de IA.' }, 500);
-  }
-  if (!quota?.allowed) return json({ error: 'Alcanzaste el límite diario de 8 mensajes con KODA IA.' }, 429);
-
   const model = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash-lite';
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
@@ -264,7 +253,7 @@ Deno.serve(async (request) => {
       flashcards = [];
     }
     if (flashcards.length < 3) return json({ error: 'KODA no pudo generar tarjetas útiles para este curso. Intenta nuevamente.' }, 502);
-    return json({ flashcards, remainingMessages: quota.remaining ?? 0 });
+    return json({ flashcards });
   }
 
   const answer = output.slice(0, MAX_REPLY_CHARS);
@@ -278,5 +267,5 @@ Deno.serve(async (request) => {
     ]);
   if (historyWriteError) console.error('No se pudo guardar el historial del asistente', historyWriteError.message);
 
-  return json({ answer, remainingMessages: quota.remaining ?? 0, historySaved: !historyWriteError });
+  return json({ answer, historySaved: !historyWriteError });
 });
