@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { getCatalogProgram, getProgramsForInstitution, getSuggestedCourses } from '@/data/academic-catalog';
 import { KodaReveal } from '@/components/koda-reveal';
@@ -17,6 +17,7 @@ import {
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { getStudyReminderStatus, scheduleStudyReminders, type StudyReminderStatus } from '@/features/reminders/study-reminders';
+import { deleteKodaAccount, exportKodaPersonalData } from '@/features/privacy/account-privacy';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaData } from '@/providers/koda-data-provider';
@@ -24,7 +25,7 @@ import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function ProfileScreen() {
   const { colorScheme, theme, toggleColorScheme } = useKodaTheme();
-  const { workspace, addCourse, removeCourse, setCourseActive, syncError, syncState } = useKodaData();
+  const { workspace, addCourse, clearLocalWorkspace, removeCourse, setCourseActive, syncError, syncState } = useKodaData();
   const { isConfigured, session, status, signOut } = useKodaAuth();
   const [isAcademicModalVisible, setAcademicModalVisible] = useState(false);
   const [isAccountModalVisible, setAccountModalVisible] = useState(false);
@@ -32,6 +33,9 @@ export default function ProfileScreen() {
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [reminderStatus, setReminderStatus] = useState<StudyReminderStatus | null>(null);
   const [isSchedulingReminders, setSchedulingReminders] = useState(false);
+  const [privacyMessage, setPrivacyMessage] = useState<string | null>(null);
+  const [isExportingData, setExportingData] = useState(false);
+  const [isDeletingAccount, setDeletingAccount] = useState(false);
   const isDark = colorScheme === 'dark';
   const termLabel = getCatalogProgram(workspace.profile.institutionSlug, workspace.profile.programSlug)?.termLabel ?? 'Ciclo';
 
@@ -68,6 +72,53 @@ export default function ProfileScreen() {
     } finally {
       setSchedulingReminders(false);
     }
+  };
+
+  const exportPersonalData = async () => {
+    setExportingData(true);
+    setPrivacyMessage(null);
+    try {
+      setPrivacyMessage(await exportKodaPersonalData());
+    } catch (error) {
+      setPrivacyMessage(error instanceof Error ? error.message : 'No se pudo exportar tus datos.');
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    setDeletingAccount(true);
+    setPrivacyMessage(null);
+    try {
+      await deleteKodaAccount();
+      await clearLocalWorkspace();
+      await signOut();
+    } catch (error) {
+      setPrivacyMessage(error instanceof Error ? error.message : 'No se pudo eliminar tu cuenta.');
+      setDeletingAccount(false);
+    }
+  };
+
+  const confirmAccountDeletion = () => {
+    Alert.alert(
+      '¿Eliminar tu cuenta?',
+      'Se borrarán de forma definitiva tus cursos, plan, flashcards, resultados, historial de IA y materiales privados. Guarda antes cualquier PDF o audio que quieras conservar.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Continuar',
+          style: 'destructive',
+          onPress: () => Alert.alert(
+            'Última confirmación',
+            'Esta acción no se puede deshacer.',
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Eliminar definitivamente', style: 'destructive', onPress: () => void deleteAccount() },
+            ],
+          ),
+        },
+      ],
+    );
   };
 
   return (
@@ -200,6 +251,45 @@ export default function ProfileScreen() {
         {reminderMessage ? <Text style={[styles.syncText, { color: theme.textSecondary }]}>{reminderMessage}</Text> : null}
       </KodaReveal>
 
+      {status === 'signed_in' ? (
+        <KodaReveal delay={270} style={styles.sectionBlock}>
+          <KodaSectionTitle title="Tus datos" />
+          <KodaCard style={styles.privacyCard}>
+            <View style={[styles.preferenceIcon, { backgroundColor: theme.accentSoft }]}>
+              <Ionicons color={theme.accent} name="shield-checkmark-outline" size={19} />
+            </View>
+            <View style={styles.privacyCopy}>
+              <Text style={[styles.preferenceTitle, { color: theme.text }]}>Descargar mis datos</Text>
+              <Text style={[styles.preferenceText, { color: theme.textSecondary }]}>Guarda un archivo JSON con tu perfil, plan, repaso, resultados e historial de IA. Tus PDF o audios originales no se adjuntan.</Text>
+            </View>
+            <KodaButton
+              disabled={isExportingData || isDeletingAccount}
+              icon="download-outline"
+              label={isExportingData ? 'Preparando…' : 'Exportar'}
+              onPress={() => void exportPersonalData()}
+              variant="secondary"
+            />
+          </KodaCard>
+          <KodaCard style={[styles.privacyCard, { borderColor: theme.danger }]}>
+            <View style={[styles.preferenceIcon, { backgroundColor: theme.warningSoft }]}>
+              <Ionicons color={theme.danger} name="trash-outline" size={19} />
+            </View>
+            <View style={styles.privacyCopy}>
+              <Text style={[styles.preferenceTitle, { color: theme.text }]}>Eliminar mi cuenta</Text>
+              <Text style={[styles.preferenceText, { color: theme.textSecondary }]}>Borra la cuenta y todos sus datos de KODA. Te pediremos dos confirmaciones antes de continuar.</Text>
+            </View>
+            <KodaButton
+              disabled={isDeletingAccount || isExportingData}
+              label={isDeletingAccount ? 'Eliminando…' : 'Eliminar'}
+              onPress={confirmAccountDeletion}
+              style={[styles.deleteButton, { backgroundColor: theme.warningSoft, borderColor: theme.danger }]}
+              variant="secondary"
+            />
+          </KodaCard>
+          {privacyMessage ? <Text style={[styles.syncText, { color: theme.textSecondary }]}>{privacyMessage}</Text> : null}
+        </KodaReveal>
+      ) : null}
+
       {isAcademicModalVisible ? <AcademicProfileModal onClose={() => setAcademicModalVisible(false)} /> : null}
       {isAccountModalVisible ? <AccountModal onClose={() => setAccountModalVisible(false)} /> : null}
     </KodaScreen>
@@ -308,6 +398,9 @@ const styles = StyleSheet.create({
   accountButton: { alignSelf: 'flex-start' },
   syncText: { fontSize: 12, fontWeight: '600', lineHeight: 17, paddingHorizontal: KodaSpacing.sm },
   reminderCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  privacyCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  privacyCopy: { flex: 1, gap: 2 },
+  deleteButton: { minWidth: 104 },
   modalOverlay: { alignItems: 'center', flex: 1, justifyContent: 'flex-end', padding: KodaSpacing.md },
   modalCard: { borderRadius: KodaRadius.lg, borderWidth: 1, maxHeight: '90%', maxWidth: 560, padding: KodaSpacing.xl, width: '100%' },
   modalContent: { gap: KodaSpacing.lg },

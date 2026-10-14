@@ -15,3 +15,8 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/study-coach/deno.json"
 entrypoint = "./functions/study-coach/index.ts"
+
+[functions.delete-koda-account]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/delete-koda-account/index.ts"

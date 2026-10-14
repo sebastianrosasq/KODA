@@ -15,7 +15,8 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Calendario académico | En crecimiento | 9 periodos 2026 con 34 eventos oficiales de matrícula, clases y evaluaciones. |
 | Repaso | Listo | Flashcards propias por curso y dominio acumulado. |
 | Seguimiento | Listo | Avance por curso, riesgos próximos y recordatorios locales semanales. |
-| IA, materiales y simulacros | Listo para configurar | PDFs y audios privados, análisis con Gemini, chat con contexto y simulacros; la clave de Gemini permanece solo en Supabase. |
+| IA, materiales y simulacros | Listo | PDFs y audios privados, análisis con Gemini, chat con contexto e historial por cuenta y simulacros; la clave de Gemini permanece solo en Supabase. |
+| Privacidad de cuenta | En cierre de release | Exportación JSON, eliminación definitiva de cuenta y materiales privados; falta publicar las páginas legales en una URL HTTPS. |
 
 ## Cómo se conecta todo
 
@@ -110,6 +111,8 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 - [Acceso con correo y Google](docs/AUTH_SETUP.md)
 - [Base segura de IA, audios, PDFs y chat](docs/AI_SETUP.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
+- [Política de privacidad para publicación](docs/PRIVACY.md)
+- [Condiciones de uso para publicación](docs/TERMS.md)
 
 ## Reglas del equipo
 

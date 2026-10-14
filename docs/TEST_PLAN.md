@@ -21,10 +21,11 @@ Las pruebas automatizadas verifican reglas deterministas. La validación de inte
 | Privacidad | Una cuenta B no lista, descarga ni elimina PDFs, audios o resultados de una cuenta A. |
 | Cuota | El tercer análisis del mismo usuario y día devuelve un mensaje claro; no envía el archivo a Gemini. |
 | Material | Se rechazan archivos que no sean PDF/audio compatible o excedan 12 MB; un material válido genera resumen, tarjetas y preguntas. |
-| Chat IA | Requiere consentimiento; puede usar el análisis de un material seleccionado, no guarda mensajes y respeta el límite de 8 mensajes diarios. |
+| Chat IA | Requiere consentimiento; puede usar el análisis de un material seleccionado, conserva el historial privado de esa cuenta, permite borrarlo y respeta el límite de 8 mensajes diarios. |
 | Simulacro | No permite finalizar con preguntas sin responder; muestra corrección y explicación al final. |
 | Accesibilidad | Botones, opciones y barra de avance tienen etiqueta/estado accesible; revisar lector de pantalla y modo oscuro en Android. |
 | Error de red | La pantalla no pierde el documento ni presenta un resultado inventado. |
+| Exportación y cuenta | El JSON contiene solo los datos de la cuenta activa; la eliminación pide dos confirmaciones, borra primero Storage privado y luego cierra la sesión. |
 
 ## Criterio de cierre
 

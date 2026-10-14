@@ -163,6 +163,7 @@ type KodaDataContextValue = {
   reviewFlashcard: (flashcardId: string, remembered: boolean) => void;
   updateAvailability: (availability: AvailabilityBlock[]) => void;
   completeSession: (sessionId: string) => void;
+  clearLocalWorkspace: () => Promise<void>;
   dashboard: {
     courseProgress: { id: string; name: string; completed: number; tone: CourseTone }[];
     nextExam: {
@@ -424,6 +425,13 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     });
   }, [updateWorkspace]);
 
+  const clearLocalWorkspace = useCallback(async () => {
+    const clearedWorkspace = createEmptyAcademicWorkspace();
+    workspaceRef.current = clearedWorkspace;
+    setWorkspace(clearedWorkspace);
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  }, []);
+
   const plan = useMemo(() => generateStudyPlan(workspace), [workspace]);
   const dashboard = useMemo(() => {
     const courseProgress = workspace.courses
@@ -478,6 +486,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       reviewFlashcard,
       updateAvailability,
       completeSession,
+      clearLocalWorkspace,
       dashboard,
     }),
     [
@@ -486,6 +495,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       addTopic,
       addFlashcard,
       completeSession,
+      clearLocalWorkspace,
       dashboard,
       hydrated,
       plan,
