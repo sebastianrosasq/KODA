@@ -9,7 +9,7 @@ import { KodaDataProvider, useKodaData } from '@/providers/koda-data-provider';
 import { KodaThemeProvider, useKodaTheme } from '@/providers/koda-theme-provider';
 import { syncStudyRemindersIfPermitted, useStudyReminderNavigation } from '@/features/reminders/study-reminders';
 import { AcademicOnboardingModal } from '@/features/onboarding/academic-onboarding-modal';
-import { KodaAccessGate } from '@/features/auth/koda-access-gate';
+import { KodaAccessGate, KodaLoadingScreen } from '@/features/auth/koda-access-gate';
 
 export default function RootLayout() {
   return (
@@ -25,7 +25,7 @@ export default function RootLayout() {
 function KodaNavigation() {
   const { colorScheme, theme } = useKodaTheme();
   const { status } = useKodaAuth();
-  const { hydrated, workspace } = useKodaData();
+  const { accountHydrated, hydrated, workspace } = useKodaData();
   useStudyReminderNavigation();
   const availabilityKey = workspace.availability.map((block) => `${block.id}:${block.day}:${block.startsAt}:${block.durationMinutes}`).join('|');
   useEffect(() => {
@@ -55,7 +55,16 @@ function KodaNavigation() {
     );
   }
 
-  if (!hydrated || !workspace.academicProfileCompleted) {
+  if (!hydrated || !accountHydrated) {
+    return (
+      <ThemeProvider value={navigationTheme}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <KodaLoadingScreen />
+      </ThemeProvider>
+    );
+  }
+
+  if (!workspace.academicProfileCompleted) {
     return (
       <ThemeProvider value={navigationTheme}>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />

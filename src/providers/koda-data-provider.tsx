@@ -146,6 +146,7 @@ function normalizeWorkspace(candidate: Partial<KodaWorkspace>): KodaWorkspace {
 
 type KodaDataContextValue = {
   hydrated: boolean;
+  accountHydrated: boolean;
   syncState: 'local' | 'syncing' | 'synced' | 'error';
   syncError: string | null;
   workspace: KodaWorkspace;
@@ -157,6 +158,7 @@ type KodaDataContextValue = {
   removeCourse: (courseId: string) => void;
   setCourseActive: (courseId: string, isActive: boolean) => void;
   addExam: (exam: Omit<StudentExam, 'id'>) => void;
+  removeExam: (examId: string) => void;
   addTopic: (topic: Omit<StudyTopic, 'id' | 'completed'>) => void;
   toggleTopic: (topicId: string) => void;
   addFlashcard: (flashcard: Omit<StudyFlashcard, 'id' | 'mastery'>) => void;
@@ -191,6 +193,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
   })();
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [hydrated, setHydrated] = useState(false);
+  const [accountHydrated, setAccountHydrated] = useState(false);
   const [syncState, setSyncState] = useState<KodaDataContextValue['syncState']>('local');
   const [syncError, setSyncError] = useState<string | null>(null);
   const workspaceRef = useRef(workspace);
@@ -252,6 +255,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     if (!hydrated || !userId) {
       syncedUserIdRef.current = null;
       const resetState = setTimeout(() => {
+        setAccountHydrated(false);
         setSyncState('local');
         setSyncError(null);
       }, 0);
@@ -259,6 +263,9 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     }
 
     let active = true;
+    const loadingStateTimer = setTimeout(() => {
+      if (active) setAccountHydrated(false);
+    }, 0);
 
     void loadWorkspaceFromSupabase(userId, workspaceRef.current)
       .then(async (remoteWorkspace) => {
@@ -271,17 +278,20 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
         }
         setCurrentWorkspace(currentWorkspace);
         syncedUserIdRef.current = userId;
+        setAccountHydrated(true);
         await syncWorkspaceToSupabase(userId, currentWorkspace);
         if (active) setSyncState('synced');
       })
       .catch((error: unknown) => {
         if (!active) return;
+        setAccountHydrated(true);
         setSyncState('error');
         setSyncError(error instanceof Error ? error.message : 'No se pudo iniciar la sincronización.');
       });
 
     return () => {
       active = false;
+      clearTimeout(loadingStateTimer);
       if (syncedUserIdRef.current === userId) syncedUserIdRef.current = null;
     };
   }, [hydrated, session?.user.id, sessionDisplayName, setCurrentWorkspace]);
@@ -368,6 +378,10 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
 
   const addExam = useCallback((exam: Omit<StudentExam, 'id'>) => {
     updateWorkspace((current) => ({ ...current, exams: [...current.exams, { ...exam, id: createId('exam') }] }));
+  }, [updateWorkspace]);
+
+  const removeExam = useCallback((examId: string) => {
+    updateWorkspace((current) => ({ ...current, exams: current.exams.filter((exam) => exam.id !== examId) }));
   }, [updateWorkspace]);
 
   const addTopic = useCallback((topic: Omit<StudyTopic, 'id' | 'completed'>) => {
@@ -469,6 +483,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       hydrated,
+      accountHydrated,
       syncState,
       syncError,
       workspace,
@@ -480,6 +495,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
       removeCourse,
       setCourseActive,
       addExam,
+      removeExam,
       addTopic,
       addFlashcard,
       toggleTopic,
@@ -492,12 +508,14 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
     [
       addCourse,
       addExam,
+      removeExam,
       addTopic,
       addFlashcard,
       completeSession,
       clearLocalWorkspace,
       dashboard,
       hydrated,
+      accountHydrated,
       plan,
       preloadCourses,
       removeCourse,

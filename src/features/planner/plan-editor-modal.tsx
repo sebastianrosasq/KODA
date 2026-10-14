@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { KodaButton, KodaIconButton, KodaPill } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { formatExamDate, MiniCalendar } from '@/features/planner/mini-calendar';
 import { useKodaData } from '@/providers/koda-data-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 import type { DayLabel } from '@/types/koda-domain';
@@ -14,17 +15,25 @@ const dayOptions: DayLabel[] = ['Hoy', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom
 function dateInDays(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-export function PlanEditorModal({ onClose }: { onClose: () => void }) {
+export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void; onExamAdded: (title: string) => void }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
-  const { addExam, addTopic, updateAvailability, workspace } = useKodaData();
+  const { addExam, addTopic, removeExam, updateAvailability, workspace } = useKodaData();
   const activeCourses = useMemo(() => workspace.courses.filter((course) => course.isActive), [workspace.courses]);
+  const upcomingExams = useMemo(
+    () => workspace.exams.slice().sort((left, right) => left.dateIso.localeCompare(right.dateIso)),
+    [workspace.exams],
+  );
   const [courseId, setCourseId] = useState(activeCourses[0]?.id ?? '');
   const [examTitle, setExamTitle] = useState('Examen parcial');
   const [examDate, setExamDate] = useState(dateInDays(3));
+  const [isCalendarVisible, setCalendarVisible] = useState(false);
   const [difficulty, setDifficulty] = useState<1 | 2 | 3>(2);
   const [topicName, setTopicName] = useState('');
   const [slotDay, setSlotDay] = useState<DayLabel>('Vie');
@@ -33,13 +42,16 @@ export function PlanEditorModal({ onClose }: { onClose: () => void }) {
   const [message, setMessage] = useState<string | null>(null);
 
   const addNewExam = () => {
-    if (!courseId || !examTitle.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(examDate)) {
-      setMessage('Completa curso, nombre y fecha con el formato AAAA-MM-DD.');
+    if (!courseId || !examTitle.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(examDate) || examDate < dateInDays(0)) {
+      setMessage('Elige un curso, nombra la evaluación y selecciona una fecha desde el calendario.');
       return;
     }
-    addExam({ courseId, title: examTitle.trim(), dateIso: examDate, difficulty });
+    const title = examTitle.trim();
+    addExam({ courseId, title, dateIso: examDate, difficulty });
     setExamTitle('Examen parcial');
-    setMessage('Examen agregado. KODA reajustó la prioridad del plan.');
+    setCalendarVisible(false);
+    setMessage('Examen añadido correctamente. Ya aparece en Exámenes próximos.');
+    onExamAdded(title);
   };
 
   const addNewTopic = () => {
@@ -67,6 +79,26 @@ export function PlanEditorModal({ onClose }: { onClose: () => void }) {
 
   const removeSlot = (slotId: string) => {
     updateAvailability(workspace.availability.filter((slot) => slot.id !== slotId));
+  };
+
+  const askToRemoveExam = (examId: string) => {
+    const exam = workspace.exams.find((item) => item.id === examId);
+    if (!exam) return;
+    Alert.alert(
+      '¿Eliminar este examen?',
+      `${exam.title} dejará de influir en tu plan de estudio.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            removeExam(examId);
+            setMessage('Examen eliminado. KODA reajustó el plan.');
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -105,16 +137,41 @@ export function PlanEditorModal({ onClose }: { onClose: () => void }) {
                   style={[styles.input, { borderColor: theme.border, color: theme.text }]}
                   value={examTitle}
                 />
-                <TextInput
-                  accessibilityLabel="Fecha del examen"
-                  onChangeText={setExamDate}
-                  placeholder="AAAA-MM-DD"
-                  placeholderTextColor={theme.textTertiary}
-                  style={[styles.input, { borderColor: theme.border, color: theme.text }]}
-                  value={examDate}
-                />
+                <Pressable
+                  accessibilityLabel="Seleccionar fecha del examen"
+                  accessibilityRole="button"
+                  onPress={() => setCalendarVisible((visible) => !visible)}
+                  style={({ pressed }) => [styles.datePicker, { backgroundColor: theme.surfaceMuted, borderColor: theme.border }, pressed && styles.pressed]}>
+                  <View style={styles.datePickerCopy}>
+                    <Text style={[styles.datePickerLabel, { color: theme.textTertiary }]}>FECHA DEL EXAMEN</Text>
+                    <Text style={[styles.datePickerValue, { color: theme.text }]}>{formatExamDate(examDate)}</Text>
+                  </View>
+                  <Ionicons color={theme.accent} name="calendar-outline" size={21} />
+                </Pressable>
+                {isCalendarVisible ? <MiniCalendar onChange={(dateIso) => {
+                  setExamDate(dateIso);
+                  setCalendarVisible(false);
+                }} value={examDate} /> : null}
                 <DifficultyPicker difficulty={difficulty} onChange={setDifficulty} />
                 <KodaButton icon="calendar-outline" label="Agregar examen" onPress={addNewExam} />
+
+                <SectionLabel label="EXÁMENES PRÓXIMOS" color={theme.textSecondary} />
+                {upcomingExams.length ? (
+                  <View style={styles.examList}>
+                    {upcomingExams.map((exam) => {
+                      const examCourse = workspace.courses.find((course) => course.id === exam.courseId);
+                      return (
+                        <View key={exam.id} style={[styles.examRow, { borderColor: theme.border }]}>
+                          <View style={styles.examRowCopy}>
+                            <Text numberOfLines={1} style={[styles.examRowTitle, { color: theme.text }]}>{exam.title}</Text>
+                            <Text numberOfLines={1} style={[styles.examRowMeta, { color: theme.textSecondary }]}>{examCourse?.name ?? 'Curso sin asignar'} · {formatExamDate(exam.dateIso)}</Text>
+                          </View>
+                          <KodaIconButton icon="trash-outline" label={`Eliminar ${exam.title}`} onPress={() => askToRemoveExam(exam.id)} />
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : <Text style={[styles.emptyExams, { color: theme.textTertiary }]}>Aún no añadiste evaluaciones.</Text>}
 
                 <SectionLabel label="TEMA PENDIENTE" color={theme.textSecondary} />
                 <TextInput
@@ -196,6 +253,10 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8, marginTop: KodaSpacing.sm },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: KodaSpacing.sm },
   input: { borderRadius: KodaRadius.md, borderWidth: 1, fontSize: 16, minHeight: 50, paddingHorizontal: KodaSpacing.md },
+  datePicker: { alignItems: 'center', borderRadius: KodaRadius.md, borderWidth: 1, flexDirection: 'row', gap: KodaSpacing.md, minHeight: 58, paddingHorizontal: KodaSpacing.md },
+  datePickerCopy: { flex: 1, gap: 2 },
+  datePickerLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  datePickerValue: { fontSize: 15, fontWeight: '800', textTransform: 'capitalize' },
   slotInputs: { flexDirection: 'row', gap: KodaSpacing.sm },
   timeInput: { flex: 1.2 },
   minutesInput: { flex: 0.8 },
@@ -204,6 +265,13 @@ const styles = StyleSheet.create({
   slotList: { gap: KodaSpacing.xs },
   slotRow: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: KodaSpacing.sm, paddingVertical: KodaSpacing.sm },
   slotText: { flex: 1, fontSize: 13, fontWeight: '700' },
+  examList: { gap: KodaSpacing.xs },
+  examRow: { alignItems: 'center', borderBottomWidth: 1, flexDirection: 'row', gap: KodaSpacing.sm, paddingBottom: KodaSpacing.sm },
+  examRowCopy: { flex: 1, gap: 2 },
+  examRowTitle: { fontSize: 13, fontWeight: '900' },
+  examRowMeta: { fontSize: 11, fontWeight: '600' },
+  emptyExams: { fontSize: 12, fontWeight: '600' },
   difficultyHint: { alignSelf: 'center', fontSize: 12, fontWeight: '600' },
   message: { fontSize: 13, fontWeight: '700', lineHeight: 18, paddingVertical: KodaSpacing.sm },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
 });

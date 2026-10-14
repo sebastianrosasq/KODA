@@ -1,13 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { KodaReveal } from '@/components/koda-reveal';
 import {
   KodaCard,
   KodaIconButton,
   KodaPageHeader,
-  KodaPill,
   KodaProgressBar,
   KodaScreen,
   KodaSectionTitle,
@@ -16,26 +15,52 @@ import {
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { PlanEditorModal } from '@/features/planner/plan-editor-modal';
 import { getDaysUntilExam } from '@/features/planner/generate-study-plan';
+import { formatExamDate } from '@/features/planner/mini-calendar';
 import { useKodaData } from '@/providers/koda-data-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 import type { CourseTone, DayLabel } from '@/types/koda-domain';
 
-const days: DayLabel[] = ['Hoy', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const dayLabels: Record<number, Exclude<DayLabel, 'Hoy'>> = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' };
 
 export default function PlanScreen() {
   const { theme } = useKodaTheme();
-  const { completeSession, plan, workspace } = useKodaData();
+  const { completeSession, plan, removeExam, workspace } = useKodaData();
   const [selectedDay, setSelectedDay] = useState<DayLabel>('Hoy');
   const [isEditorVisible, setEditorVisible] = useState(false);
+  const [examNotice, setExamNotice] = useState<string | null>(null);
   const sessions = plan.filter((session) => session.day === selectedDay);
   const totalMinutes = plan.reduce((sum, session) => sum + session.durationMinutes, 0);
   const completedSessions = plan.filter((session) => session.completed).length;
   const completion = plan.length ? Math.round((completedSessions / plan.length) * 100) : 0;
   const upcomingExams = useMemo(
-    () => workspace.exams.slice().sort((left, right) => left.dateIso.localeCompare(right.dateIso)),
+    () => workspace.exams
+      .filter((exam) => getDaysUntilExam(exam.dateIso) >= 0)
+      .slice()
+      .sort((left, right) => left.dateIso.localeCompare(right.dateIso)),
     [workspace.exams],
   );
   const pendingTopics = workspace.topics.filter((topic) => !topic.completed).slice(0, 3);
+  const weekDays = useMemo(() => getWeekDays(), []);
+
+  const askToRemoveExam = (examId: string) => {
+    const exam = workspace.exams.find((item) => item.id === examId);
+    if (!exam) return;
+    Alert.alert(
+      '¿Eliminar este examen?',
+      `${exam.title} dejará de influir en tu plan de estudio.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            removeExam(examId);
+            setExamNotice('Examen eliminado. Tu plan se reajustó.');
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <KodaScreen>
@@ -71,8 +96,25 @@ export default function PlanScreen() {
         </KodaCard>
       </KodaReveal>
 
-      <KodaReveal delay={90} style={styles.dayPicker}>
-        {days.map((day) => <KodaPill key={day} label={day} selected={selectedDay === day} onPress={() => setSelectedDay(day)} />)}
+      <KodaReveal delay={90} style={styles.calendarBlock}>
+        <Text style={[styles.calendarLabel, { color: theme.textSecondary }]}>CALENDARIO DE ESTA SEMANA</Text>
+        <View style={[styles.weekCalendar, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          {weekDays.map(({ day, date, weekday }) => {
+            const selected = selectedDay === day;
+            return (
+              <Pressable
+                key={`${day}-${date}`}
+                accessibilityLabel={`${weekday} ${date}${selected ? ', seleccionado' : ''}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => setSelectedDay(day)}
+                style={({ pressed }) => [styles.calendarDay, selected && { backgroundColor: theme.accent }, pressed && styles.pressed]}>
+                <Text style={[styles.calendarWeekday, { color: selected ? theme.onAccent : theme.textTertiary }]}>{day === 'Hoy' ? 'Hoy' : weekday}</Text>
+                <Text style={[styles.calendarDate, { color: selected ? theme.onAccent : theme.text }]}>{date}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </KodaReveal>
 
       <KodaReveal delay={135} style={styles.sectionBlock}>
@@ -119,6 +161,12 @@ export default function PlanScreen() {
 
       <KodaReveal delay={180} style={styles.sectionBlock}>
         <KodaSectionTitle title="Exámenes próximos" action="Agregar" onActionPress={() => setEditorVisible(true)} />
+        {examNotice ? (
+          <View accessibilityLiveRegion="polite" style={[styles.examNotice, { backgroundColor: theme.successSoft }]}>
+            <Ionicons color={theme.success} name="checkmark-circle-outline" size={18} />
+            <Text style={[styles.examNoticeText, { color: theme.success }]}>{examNotice}</Text>
+          </View>
+        ) : null}
         {upcomingExams.length ? upcomingExams.map((exam) => {
           const course = workspace.courses.find((item) => item.id === exam.courseId);
           const daysUntil = getDaysUntilExam(exam.dateIso);
@@ -127,9 +175,12 @@ export default function PlanScreen() {
               <View style={[styles.examMark, { backgroundColor: course ? getToneColor(course.tone, theme) : theme.accent }]} />
               <View style={styles.examCopy}>
                 <Text style={[styles.examTitle, { color: theme.text }]}>{exam.title}</Text>
-                <Text style={[styles.examMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Curso sin asignar'} · {exam.dateIso}</Text>
+                <Text style={[styles.examMeta, { color: theme.textSecondary }]}>{course?.name ?? 'Curso sin asignar'} · {formatExamDate(exam.dateIso)}</Text>
               </View>
-              <Text style={[styles.examDays, { color: theme.text }]}>{daysUntil}d</Text>
+              <View style={styles.examActions}>
+                <Text style={[styles.examDays, { color: theme.text }]}>{formatDaysUntil(daysUntil)}</Text>
+                <KodaIconButton icon="trash-outline" label={`Eliminar ${exam.title}`} onPress={() => askToRemoveExam(exam.id)} style={styles.deleteExamButton} />
+              </View>
             </KodaCard>
           );
         }) : (
@@ -164,7 +215,7 @@ export default function PlanScreen() {
         )}
       </KodaReveal>
 
-      {isEditorVisible ? <PlanEditorModal onClose={() => setEditorVisible(false)} /> : null}
+      {isEditorVisible ? <PlanEditorModal onClose={() => setEditorVisible(false)} onExamAdded={(title) => setExamNotice(`${title} se añadió correctamente. Ya aparece en tu lista.`)} /> : null}
     </KodaScreen>
   );
 }
@@ -173,6 +224,22 @@ function formatMinutes(totalMinutes: number) {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return hours ? `${hours} h ${minutes ? `${minutes} min` : ''}` : `${minutes} min`;
+}
+
+function getWeekDays(): { day: DayLabel; date: number; weekday: Exclude<DayLabel, 'Hoy'> }[] {
+  const today = new Date();
+  return Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset, 12);
+    const weekday = dayLabels[date.getDay()];
+    const day: DayLabel = offset === 0 ? 'Hoy' : weekday;
+    return { day, date: date.getDate(), weekday };
+  });
+}
+
+function formatDaysUntil(days: number) {
+  if (days === 0) return 'Hoy';
+  if (days === 1) return 'Mañana';
+  return `${days} d`;
 }
 
 function getToneColor(tone: CourseTone, theme: ReturnType<typeof useKodaTheme>['theme']) {
@@ -187,7 +254,12 @@ const styles = StyleSheet.create({
   statusPill: { alignItems: 'center', borderRadius: KodaRadius.pill, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 7 },
   statusPillText: { fontSize: 12, fontWeight: '900' },
   summaryDescription: { fontSize: 13 },
-  dayPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: KodaSpacing.sm, marginTop: -KodaSpacing.sm },
+  calendarBlock: { gap: KodaSpacing.sm, marginTop: -KodaSpacing.sm },
+  calendarLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
+  weekCalendar: { borderRadius: KodaRadius.md, borderWidth: 1, flexDirection: 'row', padding: KodaSpacing.xs },
+  calendarDay: { alignItems: 'center', borderRadius: KodaRadius.sm, flex: 1, gap: 2, minHeight: 58, justifyContent: 'center' },
+  calendarWeekday: { fontSize: 10, fontWeight: '900' },
+  calendarDate: { fontSize: 16, fontWeight: '900' },
   sectionBlock: { gap: KodaSpacing.md },
   timeline: { gap: 0 },
   timelineRow: { flexDirection: 'row', minHeight: 128 },
@@ -210,7 +282,11 @@ const styles = StyleSheet.create({
   examCopy: { flex: 1, gap: 2 },
   examTitle: { fontSize: 14, fontWeight: '900' },
   examMeta: { fontSize: 12, fontWeight: '600' },
-  examDays: { fontSize: 16, fontWeight: '900' },
+  examActions: { alignItems: 'flex-end', gap: KodaSpacing.xs },
+  examDays: { fontSize: 12, fontWeight: '900' },
+  deleteExamButton: { height: 34, width: 34 },
+  examNotice: { alignItems: 'center', borderRadius: KodaRadius.md, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.md },
+  examNoticeText: { flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 },
   topicCard: { padding: KodaSpacing.md },
   topicRow: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm, paddingVertical: KodaSpacing.sm },
   topicDot: { borderRadius: KodaRadius.pill, height: 8, width: 8 },
@@ -218,4 +294,5 @@ const styles = StyleSheet.create({
   topicTitle: { fontSize: 13, fontWeight: '800' },
   topicMeta: { fontSize: 11, fontWeight: '600' },
   topicPriority: { fontSize: 12, fontWeight: '900' },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
 });
