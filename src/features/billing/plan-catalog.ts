@@ -13,11 +13,12 @@ export const kodaPlans: KodaPlan[] = [
     id: 'free',
     name: 'KODA Gratis',
     priceLabel: 'S/ 0',
-    summary: 'Planificación, repasos y estudio desde tus propios materiales.',
+    summary: 'Planificación, repasos y estudio desde tus propios materiales con anuncios breves y no invasivos.',
     highlights: [
       'Plan inteligente y recordatorios',
       'Chat IA para dudas de estudio',
       'Hasta 3 PDFs y 5 audios analizados al día',
+      'Anuncios no invasivos para sostener la versión gratuita',
     ],
   },
   {
@@ -29,6 +30,7 @@ export const kodaPlans: KodaPlan[] = [
       'Analítica de preparación por curso',
       'Más capacidad de análisis de materiales',
       'Simulacros y reportes de progreso avanzados',
+      'Sin anuncios',
     ],
   },
 ];

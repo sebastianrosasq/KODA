@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { KodaAuthProvider, useKodaAuth } from '@/providers/koda-auth-provider';
 import { KodaDataProvider, useKodaData } from '@/providers/koda-data-provider';
 import { KodaThemeProvider, useKodaTheme } from '@/providers/koda-theme-provider';
+import { KodaFeedbackProvider } from '@/providers/koda-feedback-provider';
 import { syncStudyRemindersIfPermitted, useStudyReminderNavigation } from '@/features/reminders/study-reminders';
 import { AcademicOnboardingModal } from '@/features/onboarding/academic-onboarding-modal';
 import { KodaAccessGate, KodaLoadingScreen } from '@/features/auth/koda-access-gate';
@@ -14,11 +15,13 @@ import { KodaAccessGate, KodaLoadingScreen } from '@/features/auth/koda-access-g
 export default function RootLayout() {
   return (
     <KodaThemeProvider>
-      <KodaAuthProvider>
-        <KodaDataProvider>
-          <KodaNavigation />
-        </KodaDataProvider>
-      </KodaAuthProvider>
+      <KodaFeedbackProvider>
+        <KodaAuthProvider>
+          <KodaDataProvider>
+            <KodaNavigation />
+          </KodaDataProvider>
+        </KodaAuthProvider>
+      </KodaFeedbackProvider>
     </KodaThemeProvider>
   );
 }

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaProgressBar, KodaScreen, KodaSectionTitle } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
@@ -9,12 +9,14 @@ import { buildFlashcardQuiz, normalizeGeneratedQuiz, scoreSimulation, type Simul
 import { listQuizAttempts, listStudyDocuments, recordQuizAttempt, type QuizAttempt, type StudyDocument } from '@/features/ai/study-documents';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaFeedback } from '@/providers/koda-feedback-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 type SimulationSource = 'document' | 'flashcards';
 
 export default function SimulationsScreen() {
   const { theme } = useKodaTheme();
+  const { showNotice } = useKodaFeedback();
   const { status } = useKodaAuth();
   const { workspace } = useKodaData();
   const courses = useMemo(() => workspace.courses.filter((course) => course.isActive), [workspace.courses]);
@@ -79,7 +81,7 @@ export default function SimulationsScreen() {
   function startFromFlashcards() {
     const nextQuestions = buildFlashcardQuiz(courseCards);
     if (!nextQuestions.length) {
-      Alert.alert('Faltan tarjetas variadas', 'Crea o guarda al menos dos flashcards con respuestas diferentes para construir un simulacro.');
+      showNotice({ title: 'Faltan tarjetas variadas', message: 'Crea o guarda al menos dos flashcards con respuestas diferentes para construir un simulacro.', tone: 'info' });
       return;
     }
     resetSimulation(nextQuestions, 'flashcards', null, selectedCourseId);
@@ -88,7 +90,7 @@ export default function SimulationsScreen() {
   function startFromDocument(document: StudyDocument) {
     const nextQuestions = normalizeGeneratedQuiz(document.analysis?.quizQuestions ?? []);
     if (!nextQuestions.length) {
-      Alert.alert('Este análisis no tiene preguntas', 'Elige otro material o genera nuevamente el análisis.');
+      showNotice({ title: 'Este análisis no tiene preguntas', message: 'Elige otro material o genera nuevamente el análisis.', tone: 'info' });
       return;
     }
     resetSimulation(nextQuestions, 'document', document.id, document.courseId);
@@ -117,7 +119,7 @@ export default function SimulationsScreen() {
       });
       await loadData();
     } catch (error) {
-      Alert.alert('Resultado no sincronizado', error instanceof Error ? error.message : 'El resultado sigue visible en esta sesión.');
+      showNotice({ title: 'Resultado no sincronizado', message: error instanceof Error ? error.message : 'El resultado sigue visible en esta sesión.', tone: 'danger' });
     } finally {
       setSaving(false);
     }

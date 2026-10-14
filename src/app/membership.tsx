@@ -22,7 +22,7 @@ export default function MembershipScreen() {
 
       <KodaCard style={[styles.notice, { backgroundColor: theme.accentSoft, borderColor: theme.accentSoft }]}>
         <Text style={[styles.noticeTitle, { color: theme.text }]}>Tu estudio actual no cambia</Text>
-        <Text style={[styles.noticeText, { color: theme.textSecondary }]}>KODA seguirá ofreciendo planificación, repaso y el chat de estudio. La suscripción se activará solo cuando la pasarela de pagos, los términos y los controles de privacidad estén listos.</Text>
+        <Text style={[styles.noticeText, { color: theme.textSecondary }]}>KODA seguirá ofreciendo planificación, repaso y el chat de estudio. La versión gratuita considerará anuncios breves y no invasivos; KODA Plus será sin anuncios. La suscripción se activará solo cuando la pasarela de pagos, los términos y los controles de privacidad estén listos.</Text>
       </KodaCard>
 
       {kodaPlans.map((plan) => (
@@ -51,7 +51,7 @@ export default function MembershipScreen() {
           <Pressable onPress={() => undefined} style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.modalEyebrow, { color: theme.accent }]}>KODA PLUS</Text>
             <Text style={[styles.modalTitle, { color: theme.text }]}>Próximamente</Text>
-            <Text style={[styles.modalText, { color: theme.textSecondary }]}>La propuesta es S/ 9.90 al mes e incluiría más análisis, simulacros y seguimiento avanzado. Aún no hay cobros, tarjetas ni suscripciones activas.</Text>
+            <Text style={[styles.modalText, { color: theme.textSecondary }]}>La propuesta es S/ 9.90 al mes e incluiría más análisis, simulacros, seguimiento avanzado y una experiencia sin anuncios. Aún no hay cobros, tarjetas ni suscripciones activas.</Text>
             <KodaButton label="Entendido" onPress={() => setPlusModalVisible(false)} />
           </Pressable>
         </Pressable>

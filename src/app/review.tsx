@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
 import {
@@ -20,12 +20,14 @@ import { generateCourseFlashcards } from '@/features/ai/study-coach';
 import { analyzeStudyDocument, getAiDocumentConsent, markDocumentFlashcardsImported, uploadStudyDocument } from '@/features/ai/study-documents';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaFeedback } from '@/providers/koda-feedback-provider';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 import type { CourseTone } from '@/types/koda-domain';
 
 export default function ReviewScreen() {
   const { theme } = useKodaTheme();
+  const { showNotice } = useKodaFeedback();
   const { workspace, addFlashcard, addFlashcards, reviewFlashcard } = useKodaData();
   const { status } = useKodaAuth();
   const [showAnswer, setShowAnswer] = useState(false);
@@ -66,7 +68,7 @@ export default function ReviewScreen() {
       addFlashcards(cards.map((card) => ({ courseId, prompt: card.question, answer: card.answer })));
       setGenerationFeedback(`KODA creó ${cards.length} tarjetas iniciales para ${courseName}. Revísalas con tus apuntes antes de memorizarlas.`);
     } catch (error) {
-      Alert.alert('No se pudieron generar las tarjetas', error instanceof Error ? error.message : 'Intenta nuevamente en unos momentos.');
+      showNotice({ title: 'No se pudieron generar las tarjetas', message: error instanceof Error ? error.message : 'Intenta nuevamente en unos momentos.', tone: 'danger' });
     } finally {
       setGeneratingCourseId(null);
     }
@@ -74,13 +76,13 @@ export default function ReviewScreen() {
 
   const generatePdfDeck = async (courseId: string) => {
     if (status !== 'signed_in') {
-      Alert.alert('Inicia sesión', 'Necesitas una cuenta para guardar el PDF y sus flashcards.');
+      showNotice({ title: 'Inicia sesión', message: 'Necesitas una cuenta para guardar el PDF y sus flashcards.', tone: 'info' });
       return;
     }
     try {
       const hasConsent = await getAiDocumentConsent();
       if (!hasConsent) {
-        Alert.alert('Confirma el uso de IA', 'Acepta el aviso de IA en Materiales una sola vez antes de generar tarjetas desde un PDF.');
+        showNotice({ title: 'Confirma el uso de IA', message: 'Acepta el aviso de IA en Materiales una sola vez antes de generar tarjetas desde un PDF.', tone: 'info' });
         return;
       }
       const result = await DocumentPicker.getDocumentAsync({
@@ -98,9 +100,9 @@ export default function ReviewScreen() {
       addFlashcards(analysis.flashcards.map((card) => ({ courseId, prompt: card.question, answer: card.answer })));
       await markDocumentFlashcardsImported(documentId);
       setPdfVisible(false);
-      Alert.alert('8 tarjetas listas', `Las tarjetas de ${courseName} ya están en tu mazo. El PDF y su análisis también quedaron guardados en Materiales.`);
+      showNotice({ title: '8 tarjetas listas', message: `Las tarjetas de ${courseName} ya están en tu mazo. El PDF y su análisis también quedaron guardados en Materiales.` });
     } catch (error) {
-      Alert.alert('No se pudieron crear las tarjetas', error instanceof Error ? error.message : 'Intenta nuevamente con otro PDF.');
+      showNotice({ title: 'No se pudieron crear las tarjetas', message: error instanceof Error ? error.message : 'Intenta nuevamente con otro PDF.', tone: 'danger' });
     } finally {
       setPdfGenerating(false);
     }

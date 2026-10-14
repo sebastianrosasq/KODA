@@ -154,7 +154,7 @@ type KodaDataContextValue = {
   updateProfile: (profile: StudentAcademicProfile) => void;
   completeAcademicProfile: (profile: StudentAcademicProfile, courseNames: string[]) => void;
   replaceAcademicCourses: (profile: StudentAcademicProfile, courseNames: string[]) => void;
-  addCourse: (name: string) => void;
+  addCourse: (name: string) => 'added' | 'empty' | 'duplicate';
   preloadCourses: (names: string[]) => void;
   removeCourse: (courseId: string) => void;
   setCourseActive: (courseId: string, isActive: boolean) => void;
@@ -337,9 +337,12 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
 
   const completeAcademicProfile = replaceAcademicCourses;
 
-  const addCourse = useCallback((name: string) => {
+  const addCourse = useCallback((name: string): 'added' | 'empty' | 'duplicate' => {
     const normalizedName = name.trim();
-    if (!normalizedName) return;
+    if (!normalizedName) return 'empty';
+    if (workspaceRef.current.courses.some((course) => course.name.trim().toLocaleLowerCase() === normalizedName.toLocaleLowerCase())) {
+      return 'duplicate';
+    }
 
     updateWorkspace((current) => ({
       ...current,
@@ -355,6 +358,7 @@ export function KodaDataProvider({ children }: { children: ReactNode }) {
         },
       ],
     }));
+    return 'added';
   }, [updateWorkspace]);
 
   const preloadCourses = useCallback((names: string[]) => {

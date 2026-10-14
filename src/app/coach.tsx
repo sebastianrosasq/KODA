@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaScreen } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
@@ -13,6 +13,7 @@ import {
 } from '@/features/ai/study-coach';
 import { getAiDocumentConsent, listStudyDocuments, recordAiDocumentConsent, type StudyDocument } from '@/features/ai/study-documents';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
+import { useKodaFeedback } from '@/providers/koda-feedback-provider';
 
 type CoachMessage = Pick<StudyCoachMessage, 'id' | 'role' | 'text'>;
 
@@ -42,6 +43,7 @@ function CoachMessageText({ message, color }: { message: CoachMessage; color: st
 
 export default function CoachScreen() {
   const { theme } = useKodaTheme();
+  const { confirm, showNotice } = useKodaFeedback();
   const params = useLocalSearchParams<{ documentId?: string | string[] }>();
   const initialDocumentId = typeof params.documentId === 'string' ? params.documentId : '';
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
@@ -91,7 +93,7 @@ export default function CoachScreen() {
       await recordAiDocumentConsent();
       setHasConsent(true);
     } catch (error) {
-      Alert.alert('No se pudo guardar tu decisión', error instanceof Error ? error.message : 'Intenta nuevamente.');
+      showNotice({ title: 'No se pudo guardar tu decisión', message: error instanceof Error ? error.message : 'Intenta nuevamente.', tone: 'danger' });
     } finally {
       setConsenting(false);
     }
@@ -129,28 +131,25 @@ export default function CoachScreen() {
     }
   };
 
-  const confirmClearHistory = () => {
-    Alert.alert('Limpiar historial', 'Se eliminarán tus preguntas y respuestas guardadas de esta cuenta. Esta acción no se puede deshacer.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Limpiar',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              setClearingHistory(true);
-              await clearStudyCoachMessages();
-              setMessages([welcomeMessage]);
-              setRequestError(null);
-            } catch (error) {
-              Alert.alert('No se pudo limpiar el historial', error instanceof Error ? error.message : 'Intenta nuevamente.');
-            } finally {
-              setClearingHistory(false);
-            }
-          })();
-        },
-      },
-    ]);
+  const confirmClearHistory = async () => {
+    const accepted = await confirm({
+      title: '¿Limpiar historial?',
+      message: 'Se eliminarán tus preguntas y respuestas guardadas de esta cuenta. Esta acción no se puede deshacer.',
+      confirmLabel: 'Limpiar',
+      destructive: true,
+    });
+    if (!accepted) return;
+    try {
+      setClearingHistory(true);
+      await clearStudyCoachMessages();
+      setMessages([welcomeMessage]);
+      setRequestError(null);
+      showNotice({ title: 'Historial eliminado', message: 'Tu próxima conversación empezará desde cero.' });
+    } catch (error) {
+      showNotice({ title: 'No se pudo limpiar el historial', message: error instanceof Error ? error.message : 'Intenta nuevamente.', tone: 'danger' });
+    } finally {
+      setClearingHistory(false);
+    }
   };
 
   return (
@@ -161,7 +160,7 @@ export default function CoachScreen() {
         subtitle="Puedes preguntar sin subir nada; un material solo añade contexto específico. Tu historial queda en tu cuenta."
         right={
           <View style={styles.headerActions}>
-            {messages.length > 1 ? <KodaIconButton icon="trash-outline" label={isClearingHistory ? 'Limpiando historial' : 'Limpiar historial'} onPress={isClearingHistory ? undefined : confirmClearHistory} style={isClearingHistory ? styles.disabledAction : undefined} /> : null}
+            {messages.length > 1 ? <KodaIconButton icon="trash-outline" label={isClearingHistory ? 'Limpiando historial' : 'Limpiar historial'} onPress={isClearingHistory ? undefined : () => void confirmClearHistory()} style={isClearingHistory ? styles.disabledAction : undefined} /> : null}
             <KodaIconButton icon="chevron-back" label="Volver" onPress={() => router.back()} />
           </View>
         }

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { KodaReveal } from '@/components/koda-reveal';
 import {
@@ -17,6 +17,7 @@ import { PlanEditorModal } from '@/features/planner/plan-editor-modal';
 import { getDaysUntilExam } from '@/features/planner/generate-study-plan';
 import { formatExamDate } from '@/features/planner/mini-calendar';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaFeedback } from '@/providers/koda-feedback-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 import type { CourseTone, DayLabel } from '@/types/koda-domain';
 
@@ -24,6 +25,7 @@ const dayLabels: Record<number, Exclude<DayLabel, 'Hoy'>> = { 0: 'Dom', 1: 'Lun'
 
 export default function PlanScreen() {
   const { theme } = useKodaTheme();
+  const { confirm, showNotice } = useKodaFeedback();
   const { completeSession, plan, removeExam, workspace } = useKodaData();
   const [selectedDay, setSelectedDay] = useState<DayLabel>('Hoy');
   const [isEditorVisible, setEditorVisible] = useState(false);
@@ -33,6 +35,8 @@ export default function PlanScreen() {
   const completedSessions = plan.filter((session) => session.completed).length;
   const completion = plan.length ? Math.round((completedSessions / plan.length) * 100) : 0;
   const hasAvailableBlocks = workspace.availability.length > 0;
+  const hasAssessment = workspace.exams.some((exam) => exam.kind !== 'activity');
+  const hasPendingTopics = workspace.topics.some((topic) => !topic.completed);
   const upcomingExams = useMemo(
     () => workspace.exams
       .filter((exam) => getDaysUntilExam(exam.dateIso) >= 0)
@@ -43,24 +47,18 @@ export default function PlanScreen() {
   const pendingTopics = workspace.topics.filter((topic) => !topic.completed).slice(0, 3);
   const weekDays = useMemo(() => getWeekDays(), []);
 
-  const askToRemoveExam = (examId: string) => {
+  const askToRemoveExam = async (examId: string) => {
     const exam = workspace.exams.find((item) => item.id === examId);
     if (!exam) return;
-    Alert.alert(
-      `¿Eliminar ${exam.kind === 'activity' ? 'esta actividad' : 'esta evaluación'}?`,
-      `${exam.title} dejará de aparecer en tu agenda.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            removeExam(examId);
-            Alert.alert('Evento eliminado', 'Tu agenda y tus sesiones se reajustaron.');
-          },
-        },
-      ],
-    );
+    const accepted = await confirm({
+      title: `¿Eliminar ${exam.kind === 'activity' ? 'esta actividad' : 'esta evaluación'}?`,
+      message: `${exam.title} dejará de aparecer en tu agenda.`,
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    });
+    if (!accepted) return;
+    removeExam(examId);
+    showNotice({ title: 'Evento eliminado', message: 'Tu agenda y tus sesiones se reajustaron.' });
   };
 
   return (
@@ -91,10 +89,12 @@ export default function PlanScreen() {
           <KodaProgressBar color={theme.accent} progress={completion} />
           <KodaText tone="secondary" style={styles.summaryDescription}>
             {plan.length
-              ? `${completedSessions} de ${plan.length} bloques completados. Puedes mover o añadir horas cuando tu semana cambie.`
+              ? hasAssessment || hasPendingTopics
+                ? `${completedSessions} de ${plan.length} bloques completados. KODA ordena la semana por fecha, dificultad y temas pendientes.`
+                : `${completedSessions} de ${plan.length} bloques completados. Por ahora son repasos generales: añade una evaluación o un tema para priorizarlos.`
               : hasAvailableBlocks
-                ? `${workspace.availability.length} bloques reservados por ${formatMinutes(reservedMinutes)}. Añade un tema o evaluación para que KODA priorice cada sesión.`
-                : 'Registra tus exámenes, temas y horas disponibles para que KODA arme bloques realistas.'}
+                ? `${workspace.availability.length} bloques reservados por ${formatMinutes(reservedMinutes)}. Añade un tema o evaluación para que KODA los priorice.`
+                : 'Primer paso: reserva una hora real de estudio. Luego añade una evaluación o un tema para que KODA arme sesiones útiles.'}
           </KodaText>
         </KodaCard>
       </KodaReveal>
@@ -177,7 +177,7 @@ export default function PlanScreen() {
               </View>
               <View style={styles.examActions}>
                 <Text style={[styles.examDays, { color: theme.text }]}>{formatDaysUntil(daysUntil)}</Text>
-                <KodaIconButton icon="trash-outline" label={`Eliminar ${exam.title}`} onPress={() => askToRemoveExam(exam.id)} style={styles.deleteExamButton} />
+                <KodaIconButton icon="trash-outline" label={`Eliminar ${exam.title}`} onPress={() => void askToRemoveExam(exam.id)} style={styles.deleteExamButton} />
               </View>
             </KodaCard>
           );
@@ -215,7 +215,7 @@ export default function PlanScreen() {
 
       {isEditorVisible ? <PlanEditorModal onClose={() => setEditorVisible(false)} onExamAdded={(title) => {
         setEditorVisible(false);
-        Alert.alert('Evaluación añadida', `${title} ya aparece en tus próximas evaluaciones.`);
+        showNotice({ title: 'Evaluación añadida', message: `${title} ya aparece en tus próximas evaluaciones.` });
       }} /> : null}
     </KodaScreen>
   );

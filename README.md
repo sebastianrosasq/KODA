@@ -17,13 +17,19 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Fundación y diseño | Listo | Expo Router, TypeScript, diseño claro/oscuro y componentes reutilizables. |
 | Cuenta y datos | Listo | Correo, sesión segura, RLS y sincronización; Google funciona cuando el proveedor está habilitado en el entorno correspondiente. |
 | Organización | Listo | Cursos, exámenes, temas, disponibilidad y un plan explicable. |
-| Catálogo curricular | En crecimiento | Instituciones indexadas, mallas oficiales contrastadas y registro inicial solo con ciclos completos; Continental se incorpora con su plan oficial. |
+| Catálogo curricular | En crecimiento | Registro solo con mallas completas contrastadas; Ciencia de la Computación de UCSP ya está integrada, mientras UNSA y programas adicionales permanecen indexados hasta completar su verificación. UPN fue retirada del catálogo activo. |
 | Calendario académico | En crecimiento | 9 periodos 2026 con 34 eventos oficiales de matrícula, clases y evaluaciones. |
 | Repaso | Listo | Flashcards propias, generación inicial por curso, PDF directo a 8 tarjetas y dominio acumulado. |
 | Seguimiento | Listo | Avance por curso, riesgos próximos y recordatorios locales semanales. |
 | IA, materiales y simulacros | Listo | PDFs y audios privados con cantidad de tarjetas elegible (1–6), PDF directo a 8 tarjetas, chat útil aun sin material, historial por cuenta y simulacros; la clave de Gemini permanece solo en Supabase. |
 | Perfil | Listo | Foto privada de perfil, preferencias, recordatorios, exportación y eliminación de cuenta. |
-| Privacidad de cuenta | En cierre de release | Exportación JSON, eliminación definitiva de cuenta y materiales privados; falta publicar las páginas legales en una URL HTTPS. |
+| Privacidad de cuenta | En cierre de release | Exportación JSON, eliminación definitiva de cuenta, materiales privados y limpieza de archivos; falta desplegar la función de borrado y publicar las páginas legales en una URL HTTPS. |
+
+## Versión de demostración actual
+
+La distribución interna actual es **Android `0.1.1 (2)`**. Incluye avisos visuales propios de KODA, mejoras en la planificación, cursos propios con validación, propuesta Freemium/Plus y el catálogo curricular actualizado.
+
+Antes de publicar una nueva APK, revisa la [lista de salida a release](docs/RELEASE_CHECKLIST.md). El historial y el guion de exposición del equipo están en [presentacion-koda-roles.md](docs/presentacion-koda-roles.md).
 
 ## Cómo se conecta todo
 
@@ -82,14 +88,16 @@ npx expo-doctor
 npx expo export --platform web
 ```
 
-Antes de entregar una APK que use IA, publica las dos funciones que procesan el material y el chat:
+Antes de entregar una APK que use IA o eliminación definitiva de cuenta, aplica las migraciones y publica las funciones del backend:
 
 ```powershell
+npx supabase db push
 npx supabase functions deploy analyze-study-document
 npx supabase functions deploy study-coach
+npx supabase functions deploy delete-koda-account
 ```
 
-Después comprueba el acceso, una subida de PDF o audio y el chat en un dispositivo físico. Cuando esas comprobaciones estén listas, crea la distribución interna con `npx eas-cli@latest build --platform android --profile preview`.
+Después comprueba el acceso, una subida de PDF o audio, el chat y la eliminación de cuenta en un dispositivo físico. Cuando esas comprobaciones estén listas, crea la distribución interna con `npx eas-cli@latest build --platform android --profile preview`.
 
 ## Arquitectura del repositorio
 
@@ -129,6 +137,8 @@ El detalle de instituciones, planes, fuentes y próximos contrastes está en [CU
 - [Base segura de IA, audios, PDFs y chat](docs/AI_SETUP.md)
 - [Modelo freemium, hipótesis de precio y arquitectura de cobro](docs/MONETIZATION.md)
 - [Estado de preparación para la presentación](docs/PRESENTATION_READINESS.md)
+- [Lista de salida a release](docs/RELEASE_CHECKLIST.md)
+- [Guion de presentación por roles](docs/presentacion-koda-roles.md)
 - [Accesos y secretos por etapa](docs/ACCESS_AND_SECRETS.md)
 - [Política de privacidad para publicación](docs/PRIVACY.md)
 - [Condiciones de uso para publicación](docs/TERMS.md)

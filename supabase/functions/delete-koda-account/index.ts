@@ -2,6 +2,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const DOCUMENT_BUCKET = 'koda-study-documents';
+const AVATAR_BUCKET = 'koda-profile-avatars';
 const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -41,24 +42,26 @@ function getSecretKey() {
   return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 }
 
-async function removeStudentMaterials(
+async function removeStudentFiles(
   client: ReturnType<typeof createClient>,
   userId: string,
+  bucket: string,
+  failureMessage: string,
 ) {
   // Se consulta desde el inicio en cada vuelta: luego de borrar una página,
   // la siguiente ocupa el mismo lugar. Así no se dejan materiales atrás si
   // una cuenta acumuló más de mil archivos.
   while (true) {
-    const { data, error } = await client.storage.from(DOCUMENT_BUCKET).list(userId, { limit: 1000 });
-    if (error) throw new Error('No se pudo preparar la eliminación de tus materiales.');
+    const { data, error } = await client.storage.from(bucket).list(userId, { limit: 1000 });
+    if (error) throw new Error(failureMessage);
 
     const paths = (data ?? [])
       .filter((item) => item.id !== null)
       .map((item) => `${userId}/${item.name}`);
     if (!paths.length) return;
 
-    const { error: removeError } = await client.storage.from(DOCUMENT_BUCKET).remove(paths);
-    if (removeError) throw new Error('No se pudieron borrar tus materiales privados.');
+    const { error: removeError } = await client.storage.from(bucket).remove(paths);
+    if (removeError) throw new Error(failureMessage);
   }
 }
 
@@ -91,7 +94,8 @@ Deno.serve(async (request) => {
     // Supabase no borra un usuario Auth dueño de objetos Storage. Primero se
     // eliminan únicamente los objetos bajo su UUID y luego las filas hacen
     // cascade mediante sus claves foráneas hacia auth.users.
-    await removeStudentMaterials(adminClient, userData.user.id);
+    await removeStudentFiles(adminClient, userData.user.id, DOCUMENT_BUCKET, 'No se pudieron borrar tus materiales privados.');
+    await removeStudentFiles(adminClient, userData.user.id, AVATAR_BUCKET, 'No se pudo borrar tu foto de perfil privada.');
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userData.user.id, false);
     if (deleteError) {
       console.error('No se pudo eliminar la cuenta de KODA', deleteError.message);

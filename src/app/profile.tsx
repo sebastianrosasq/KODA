@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { getCatalogProgram, getProgramsForInstitution, getSuggestedCourses } from '@/data/academic-catalog';
 import { KodaReveal } from '@/components/koda-reveal';
@@ -24,10 +24,12 @@ import { deleteKodaAccount, exportKodaPersonalData } from '@/features/privacy/ac
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaFeedback } from '@/providers/koda-feedback-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function ProfileScreen() {
   const { colorScheme, theme, toggleColorScheme } = useKodaTheme();
+  const { confirm, showNotice } = useKodaFeedback();
   const { workspace, addCourse, clearLocalWorkspace, removeCourse, setCourseActive, syncError, syncState, updateProfile } = useKodaData();
   const { isConfigured, session, status, signOut } = useKodaAuth();
   const [isAcademicModalVisible, setAcademicModalVisible] = useState(false);
@@ -59,8 +61,18 @@ export default function ProfileScreen() {
   }, [refreshReminderStatus]);
 
   const submitCourse = () => {
-    addCourse(newCourseName);
+    const result = addCourse(newCourseName);
+    if (result === 'empty') {
+      showNotice({ title: 'Escribe el nombre del curso', message: 'Por ejemplo, “Cálculo II” o “Diseño de interfaces”.', tone: 'info' });
+      return;
+    }
+    if (result === 'duplicate') {
+      showNotice({ title: 'Ese curso ya existe', message: 'Revisa tu lista para evitar duplicar la planificación.', tone: 'info' });
+      return;
+    }
+    const courseName = newCourseName.trim();
     setNewCourseName('');
+    showNotice({ title: 'Curso añadido', message: `${courseName} ya está disponible en tu plan.` });
   };
 
   const chooseAvatar = async () => {
@@ -77,7 +89,7 @@ export default function ProfileScreen() {
       const avatar = await uploadProfileAvatar(result.assets[0]);
       updateProfile({ ...workspace.profile, avatarPath: avatar.path, avatarUrl: avatar.url ?? undefined });
     } catch (error) {
-      Alert.alert('No se pudo actualizar la foto', error instanceof Error ? error.message : 'Elige otra foto e inténtalo nuevamente.');
+      showNotice({ title: 'No se pudo actualizar la foto', message: error instanceof Error ? error.message : 'Elige otra foto e inténtalo nuevamente.', tone: 'danger' });
     } finally {
       setUpdatingAvatar(false);
     }
@@ -122,32 +134,28 @@ export default function ProfileScreen() {
       await deleteKodaAccount();
       await clearLocalWorkspace();
       await signOut();
+      showNotice({ title: 'Cuenta eliminada', message: 'Tu espacio y tus materiales privados se borraron. Si vuelves a registrarte, empezarás desde institución y ciclo.' });
     } catch (error) {
       setPrivacyMessage(error instanceof Error ? error.message : 'No se pudo eliminar tu cuenta.');
       setDeletingAccount(false);
     }
   };
 
-  const confirmAccountDeletion = () => {
-    Alert.alert(
-      '¿Eliminar tu cuenta?',
-      'Se borrarán de forma definitiva tus cursos, plan, flashcards, resultados, historial de IA y materiales privados. Guarda antes cualquier PDF o audio que quieras conservar.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Continuar',
-          style: 'destructive',
-          onPress: () => Alert.alert(
-            'Última confirmación',
-            'Esta acción no se puede deshacer.',
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              { text: 'Eliminar definitivamente', style: 'destructive', onPress: () => void deleteAccount() },
-            ],
-          ),
-        },
-      ],
-    );
+  const confirmAccountDeletion = async () => {
+    const firstConfirmation = await confirm({
+      title: '¿Eliminar tu cuenta?',
+      message: 'Se borrarán de forma definitiva tus cursos, plan, flashcards, resultados, historial de IA y materiales privados. Guarda antes cualquier PDF o audio que quieras conservar.',
+      confirmLabel: 'Continuar',
+      destructive: true,
+    });
+    if (!firstConfirmation) return;
+    const finalConfirmation = await confirm({
+      title: 'Última confirmación',
+      message: 'Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar definitivamente',
+      destructive: true,
+    });
+    if (finalConfirmation) void deleteAccount();
   };
 
   return (
@@ -332,7 +340,7 @@ export default function ProfileScreen() {
             <KodaButton
               disabled={isDeletingAccount || isExportingData}
               label={isDeletingAccount ? 'Eliminando…' : 'Eliminar'}
-              onPress={confirmAccountDeletion}
+              onPress={() => void confirmAccountDeletion()}
               style={[styles.deleteButton, { backgroundColor: theme.warningSoft, borderColor: theme.danger }]}
               variant="secondary"
             />
@@ -351,6 +359,7 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
   const { workspace, replaceAcademicCourses } = useKodaData();
+  const { showNotice } = useKodaFeedback();
   const institutionSlug = workspace.profile.institutionSlug;
   const programs = useMemo(() => getProgramsForInstitution(institutionSlug), [institutionSlug]);
   const [programSlug, setProgramSlug] = useState(workspace.profile.programSlug);
@@ -376,7 +385,7 @@ function AcademicProfileModal({ onClose }: { onClose: () => void }) {
       };
       const suggestedCourses = await getSuggestedCourses(institutionSlug, selectedProgram.slug, term);
       if (!suggestedCourses.length) {
-        Alert.alert('Malla no disponible', 'Todavía no hay cursos verificados para esta carrera y ciclo. Tus cursos actuales no se modificaron.');
+        showNotice({ title: 'Malla no disponible', message: 'Todavía no hay cursos verificados para esta carrera y ciclo. Tus cursos actuales no se modificaron.', tone: 'info' });
         return;
       }
       replaceAcademicCourses(nextProfile, suggestedCourses);

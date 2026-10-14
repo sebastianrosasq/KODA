@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
   analyzeStudyDocument,
@@ -19,10 +19,12 @@ import { KodaButton, KodaCard, KodaIconButton, KodaPageHeader, KodaPill, KodaScr
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaFeedback } from '@/providers/koda-feedback-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function MaterialsScreen() {
   const { theme } = useKodaTheme();
+  const { confirm, showNotice } = useKodaFeedback();
   const { status } = useKodaAuth();
   const { addFlashcard, applySyllabusProposal, workspace } = useKodaData();
   const courses = useMemo(() => workspace.courses.filter((course) => course.isActive), [workspace.courses]);
@@ -67,7 +69,7 @@ export default function MaterialsScreen() {
       await recordAiDocumentConsent();
       setHasConsent(true);
     } catch (error) {
-      Alert.alert('No se pudo guardar tu decisión', error instanceof Error ? error.message : 'Intenta nuevamente.');
+      showNotice({ title: 'No se pudo guardar tu decisión', message: error instanceof Error ? error.message : 'Intenta nuevamente.', tone: 'danger' });
     } finally {
       setConsenting(false);
     }
@@ -75,11 +77,11 @@ export default function MaterialsScreen() {
 
   const chooseAndUpload = async () => {
     if (status !== 'signed_in') {
-      Alert.alert('Inicia sesión', 'Necesitas una cuenta para guardar y proteger tus materiales.');
+      showNotice({ title: 'Inicia sesión', message: 'Necesitas una cuenta para guardar y proteger tus materiales.', tone: 'info' });
       return;
     }
     if (!selectedCourseId) {
-      Alert.alert('Añade un curso', 'Primero registra un curso activo para clasificar el material.');
+      showNotice({ title: 'Añade un curso', message: 'Primero registra un curso activo para clasificar el material.', tone: 'info' });
       return;
     }
 
@@ -149,7 +151,7 @@ export default function MaterialsScreen() {
       await markDocumentFlashcardsImported(document.id);
       await loadDocuments();
     } catch (error) {
-      Alert.alert('No se pudieron guardar las tarjetas', error instanceof Error ? error.message : 'Intenta nuevamente.');
+      showNotice({ title: 'No se pudieron guardar las tarjetas', message: error instanceof Error ? error.message : 'Intenta nuevamente.', tone: 'danger' });
     } finally {
       setImportingId(null);
     }
@@ -173,43 +175,35 @@ export default function MaterialsScreen() {
     }
   };
 
-  const removeDocument = (document: StudyDocument) => {
-    Alert.alert('Eliminar material', 'Se borrará el PDF o audio privado y su análisis. Esta acción no se puede deshacer.', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Eliminar',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await deleteStudyDocument(document);
-              await loadDocuments();
-            } catch (error) {
-              Alert.alert('No se pudo eliminar', error instanceof Error ? error.message : 'Intenta nuevamente.');
-            }
-          })();
-        },
-      },
-    ]);
+  const removeDocument = async (document: StudyDocument) => {
+    const accepted = await confirm({
+      title: '¿Eliminar material?',
+      message: 'Se borrará el PDF o audio privado y su análisis. Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    });
+    if (!accepted) return;
+    try {
+      await deleteStudyDocument(document);
+      await loadDocuments();
+      showNotice({ title: 'Material eliminado', message: 'El archivo y su análisis ya no están en tu cuenta.' });
+    } catch (error) {
+      showNotice({ title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Intenta nuevamente.', tone: 'danger' });
+    }
   };
 
-  const applySyllabus = (document: StudyDocument) => {
+  const applySyllabus = async (document: StudyDocument) => {
     if (!document.courseId || !document.analysis?.syllabus) return;
     const proposal = document.analysis.syllabus;
-    Alert.alert(
-      '¿Aplicar agenda sugerida?',
-      `Se añadirán ${proposal.units.flatMap((unit) => unit.topics).length} temas y ${proposal.calendarEvents.length} fechas a este curso. Puedes borrar o editar cualquier evento después.`,
-      [
-        { text: 'Revisar después', style: 'cancel' },
-        {
-          text: 'Aplicar calendario',
-          onPress: () => {
-            applySyllabusProposal({ courseId: document.courseId!, ...proposal });
-            setFeedback('La agenda del sílabo se añadió a tu plan. Revisa las fechas antes de estudiar.');
-          },
-        },
-      ],
-    );
+    const accepted = await confirm({
+      title: '¿Aplicar agenda sugerida?',
+      message: `Se añadirán ${proposal.units.flatMap((unit) => unit.topics).length} temas y ${proposal.calendarEvents.length} fechas a este curso. Puedes borrar o editar cualquier evento después.`,
+      confirmLabel: 'Aplicar calendario',
+    });
+    if (!accepted) return;
+    applySyllabusProposal({ courseId: document.courseId, ...proposal });
+    setFeedback('La agenda del sílabo se añadió a tu plan. Revisa las fechas antes de estudiar.');
+    showNotice({ title: 'Agenda añadida', message: 'Revisa las fechas y los temas propuestos antes de estudiar.' });
   };
 
   return (

@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { KodaButton, KodaIconButton, KodaPill } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { formatExamDate, MiniCalendar } from '@/features/planner/mini-calendar';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaFeedback } from '@/providers/koda-feedback-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 import type { DayLabel } from '@/types/koda-domain';
 
@@ -24,6 +25,7 @@ function dateInDays(days: number) {
 export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void; onExamAdded: (title: string) => void }) {
   const { theme } = useKodaTheme();
   const reducedMotion = useReducedMotion();
+  const { confirm, showNotice } = useKodaFeedback();
   const { addExam, addTopic, removeExam, updateAvailability, workspace } = useKodaData();
   const activeCourses = useMemo(() => workspace.courses.filter((course) => course.isActive), [workspace.courses]);
   const upcomingExams = useMemo(
@@ -40,9 +42,9 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
   const [slotTime, setSlotTime] = useState('18:30');
   const [slotMinutes, setSlotMinutes] = useState('45');
 
-  const addNewExam = () => {
+  const addNewExam = async () => {
     if (!courseId || !examTitle.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(examDate) || examDate < dateInDays(0)) {
-      Alert.alert('Revisa la evaluación', 'Elige un curso, nombra la evaluación y selecciona una fecha desde el calendario.');
+      showNotice({ title: 'Revisa la evaluación', message: 'Elige un curso, nombra la evaluación y selecciona una fecha desde el calendario.', tone: 'info' });
       return;
     }
     const title = examTitle.trim();
@@ -56,41 +58,45 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
       && exam.dateIso === examDate
       && exam.title.trim().toLocaleLowerCase() === title.toLocaleLowerCase());
     if (duplicate) {
-      Alert.alert('Evaluación repetida', 'Ya existe una evaluación con el mismo nombre, curso y fecha. ¿Quieres crearla de todos modos?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Crear de todos modos', onPress: saveExam },
-      ]);
+      const accepted = await confirm({
+        title: 'Evaluación repetida',
+        message: 'Ya existe una evaluación con el mismo nombre, curso y fecha. ¿Quieres crearla de todos modos?',
+        confirmLabel: 'Crear de todos modos',
+      });
+      if (accepted) saveExam();
       return;
     }
     saveExam();
   };
 
-  const addNewTopic = () => {
+  const addNewTopic = async () => {
     if (!courseId || !topicName.trim()) {
-      Alert.alert('Revisa el tema', 'Escribe un tema y elige un curso.');
+      showNotice({ title: 'Revisa el tema', message: 'Escribe un tema y elige un curso.', tone: 'info' });
       return;
     }
     const name = topicName.trim();
     const saveTopic = () => {
       addTopic({ courseId, name, priority: difficulty });
       setTopicName('');
-      Alert.alert('Tema añadido', `${name} ya está disponible para que KODA lo priorice.`);
+      showNotice({ title: 'Tema añadido', message: `${name} ya está disponible para que KODA lo priorice.` });
     };
     const duplicate = workspace.topics.some((topic) => topic.courseId === courseId && topic.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
     if (duplicate) {
-      Alert.alert('Tema repetido', 'Ese tema ya está en este curso. ¿Quieres conservar otra copia?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Añadir de todos modos', onPress: saveTopic },
-      ]);
+      const accepted = await confirm({
+        title: 'Tema repetido',
+        message: 'Ese tema ya está en este curso. ¿Quieres conservar otra copia?',
+        confirmLabel: 'Añadir de todos modos',
+      });
+      if (accepted) saveTopic();
       return;
     }
     saveTopic();
   };
 
-  const addNewSlot = () => {
+  const addNewSlot = async () => {
     const durationMinutes = Number(slotMinutes);
     if (!/^\d{2}:\d{2}$/.test(slotTime) || !Number.isFinite(durationMinutes) || durationMinutes < 15 || durationMinutes > 180) {
-      Alert.alert('Revisa el bloque', 'Usa una hora como 18:30 y una duración entre 15 y 180 minutos.');
+      showNotice({ title: 'Revisa el bloque', message: 'Usa una hora como 18:30 y una duración entre 15 y 180 minutos.', tone: 'info' });
       return;
     }
     const saveSlot = () => {
@@ -98,16 +104,18 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
         ...workspace.availability,
         { id: `slot-${Date.now()}`, day: slotDay, startsAt: slotTime, durationMinutes },
       ]);
-      Alert.alert('Bloque reservado', `${slotDay} · ${slotTime} · ${durationMinutes} min ya está disponible para tu plan.`);
+      showNotice({ title: 'Bloque reservado', message: `${slotDay} · ${slotTime} · ${durationMinutes} min ya está disponible para tu plan.` });
     };
     const duplicate = workspace.availability.some((block) => block.day === slotDay
       && block.startsAt === slotTime
       && block.durationMinutes === durationMinutes);
     if (duplicate) {
-      Alert.alert('Bloque repetido', 'Ya tienes este bloque de estudio. ¿Quieres crear otro igual?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Crear de todos modos', onPress: saveSlot },
-      ]);
+      const accepted = await confirm({
+        title: 'Bloque repetido',
+        message: 'Ya tienes este bloque de estudio. ¿Quieres crear otro igual?',
+        confirmLabel: 'Crear de todos modos',
+      });
+      if (accepted) saveSlot();
       return;
     }
     saveSlot();
@@ -117,24 +125,18 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
     updateAvailability(workspace.availability.filter((slot) => slot.id !== slotId));
   };
 
-  const askToRemoveExam = (examId: string) => {
+  const askToRemoveExam = async (examId: string) => {
     const exam = workspace.exams.find((item) => item.id === examId);
     if (!exam) return;
-    Alert.alert(
-      '¿Eliminar este examen?',
-      `${exam.title} dejará de influir en tu plan de estudio.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Eliminar',
-          style: 'destructive',
-          onPress: () => {
-            removeExam(examId);
-            Alert.alert('Evaluación eliminada', 'KODA reajustó el plan.');
-          },
-        },
-      ],
-    );
+    const accepted = await confirm({
+      title: '¿Eliminar esta evaluación?',
+      message: `${exam.title} dejará de influir en tu plan de estudio.`,
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    });
+    if (!accepted) return;
+    removeExam(examId);
+    showNotice({ title: 'Evaluación eliminada', message: 'KODA reajustó el plan.' });
   };
 
   return (
@@ -189,7 +191,7 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
                   setCalendarVisible(false);
                 }} value={examDate} /> : null}
                 <DifficultyPicker difficulty={difficulty} onChange={setDifficulty} />
-                <KodaButton icon="calendar-outline" label="Agregar examen" onPress={addNewExam} />
+                <KodaButton icon="calendar-outline" label="Agregar examen" onPress={() => void addNewExam()} />
 
                 <SectionLabel label="EXÁMENES PRÓXIMOS" color={theme.textSecondary} />
                 {upcomingExams.length ? (
@@ -202,7 +204,7 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
                             <Text numberOfLines={1} style={[styles.examRowTitle, { color: theme.text }]}>{exam.title}</Text>
                             <Text numberOfLines={1} style={[styles.examRowMeta, { color: theme.textSecondary }]}>{examCourse?.name ?? 'Curso sin asignar'} · {formatExamDate(exam.dateIso)}</Text>
                           </View>
-                          <KodaIconButton icon="trash-outline" label={`Eliminar ${exam.title}`} onPress={() => askToRemoveExam(exam.id)} />
+                          <KodaIconButton icon="trash-outline" label={`Eliminar ${exam.title}`} onPress={() => void askToRemoveExam(exam.id)} />
                         </View>
                       );
                     })}
@@ -218,7 +220,7 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
                   style={[styles.input, { borderColor: theme.border, color: theme.text }]}
                   value={topicName}
                 />
-                <KodaButton icon="add-outline" label="Agregar tema" onPress={addNewTopic} variant="secondary" />
+                <KodaButton icon="add-outline" label="Agregar tema" onPress={() => void addNewTopic()} variant="secondary" />
               </>
             )}
 
@@ -245,7 +247,7 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
                 value={slotMinutes}
               />
             </View>
-            <KodaButton icon="time-outline" label="Añadir bloque" onPress={addNewSlot} variant="secondary" />
+            <KodaButton icon="time-outline" label="Añadir bloque" onPress={() => void addNewSlot()} variant="secondary" />
             <View style={styles.slotList}>
               {workspace.availability.map((slot) => (
                 <View key={slot.id} style={[styles.slotRow, { borderColor: theme.border }]}>

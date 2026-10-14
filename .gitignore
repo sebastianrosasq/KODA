@@ -6,6 +6,8 @@ node_modules/
 # Expo
 .expo/
 .expo-verify-web/
+.expo-audit-web/
+.koda-apk-check/
 dist/
 web-build/
 expo-env.d.ts
