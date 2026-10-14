@@ -39,42 +39,78 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
   const [slotDay, setSlotDay] = useState<DayLabel>('Vie');
   const [slotTime, setSlotTime] = useState('18:30');
   const [slotMinutes, setSlotMinutes] = useState('45');
-  const [message, setMessage] = useState<string | null>(null);
 
   const addNewExam = () => {
     if (!courseId || !examTitle.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(examDate) || examDate < dateInDays(0)) {
-      setMessage('Elige un curso, nombra la evaluación y selecciona una fecha desde el calendario.');
+      Alert.alert('Revisa la evaluación', 'Elige un curso, nombra la evaluación y selecciona una fecha desde el calendario.');
       return;
     }
     const title = examTitle.trim();
-    addExam({ courseId, title, dateIso: examDate, difficulty });
-    setExamTitle('Examen parcial');
-    setCalendarVisible(false);
-    setMessage('Examen añadido correctamente. Ya aparece en Exámenes próximos.');
-    onExamAdded(title);
+    const saveExam = () => {
+      addExam({ courseId, title, dateIso: examDate, difficulty });
+      setExamTitle('Examen parcial');
+      setCalendarVisible(false);
+      onExamAdded(title);
+    };
+    const duplicate = workspace.exams.some((exam) => exam.courseId === courseId
+      && exam.dateIso === examDate
+      && exam.title.trim().toLocaleLowerCase() === title.toLocaleLowerCase());
+    if (duplicate) {
+      Alert.alert('Evaluación repetida', 'Ya existe una evaluación con el mismo nombre, curso y fecha. ¿Quieres crearla de todos modos?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Crear de todos modos', onPress: saveExam },
+      ]);
+      return;
+    }
+    saveExam();
   };
 
   const addNewTopic = () => {
     if (!courseId || !topicName.trim()) {
-      setMessage('Escribe un tema y elige un curso.');
+      Alert.alert('Revisa el tema', 'Escribe un tema y elige un curso.');
       return;
     }
-    addTopic({ courseId, name: topicName.trim(), priority: difficulty });
-    setTopicName('');
-    setMessage('Tema agregado al plan.');
+    const name = topicName.trim();
+    const saveTopic = () => {
+      addTopic({ courseId, name, priority: difficulty });
+      setTopicName('');
+      Alert.alert('Tema añadido', `${name} ya está disponible para que KODA lo priorice.`);
+    };
+    const duplicate = workspace.topics.some((topic) => topic.courseId === courseId && topic.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+    if (duplicate) {
+      Alert.alert('Tema repetido', 'Ese tema ya está en este curso. ¿Quieres conservar otra copia?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Añadir de todos modos', onPress: saveTopic },
+      ]);
+      return;
+    }
+    saveTopic();
   };
 
   const addNewSlot = () => {
     const durationMinutes = Number(slotMinutes);
     if (!/^\d{2}:\d{2}$/.test(slotTime) || !Number.isFinite(durationMinutes) || durationMinutes < 15 || durationMinutes > 180) {
-      setMessage('Usa una hora como 18:30 y una duración entre 15 y 180 minutos.');
+      Alert.alert('Revisa el bloque', 'Usa una hora como 18:30 y una duración entre 15 y 180 minutos.');
       return;
     }
-    updateAvailability([
-      ...workspace.availability,
-      { id: `slot-${Date.now()}`, day: slotDay, startsAt: slotTime, durationMinutes },
-    ]);
-    setMessage('Bloque disponible agregado.');
+    const saveSlot = () => {
+      updateAvailability([
+        ...workspace.availability,
+        { id: `slot-${Date.now()}`, day: slotDay, startsAt: slotTime, durationMinutes },
+      ]);
+      Alert.alert('Bloque reservado', `${slotDay} · ${slotTime} · ${durationMinutes} min ya está disponible para tu plan.`);
+    };
+    const duplicate = workspace.availability.some((block) => block.day === slotDay
+      && block.startsAt === slotTime
+      && block.durationMinutes === durationMinutes);
+    if (duplicate) {
+      Alert.alert('Bloque repetido', 'Ya tienes este bloque de estudio. ¿Quieres crear otro igual?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Crear de todos modos', onPress: saveSlot },
+      ]);
+      return;
+    }
+    saveSlot();
   };
 
   const removeSlot = (slotId: string) => {
@@ -94,7 +130,7 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
           style: 'destructive',
           onPress: () => {
             removeExam(examId);
-            setMessage('Examen eliminado. KODA reajustó el plan.');
+            Alert.alert('Evaluación eliminada', 'KODA reajustó el plan.');
           },
         },
       ],
@@ -218,7 +254,6 @@ export function PlanEditorModal({ onClose, onExamAdded }: { onClose: () => void;
                 </View>
               ))}
             </View>
-            {message ? <Text style={[styles.message, { color: theme.textSecondary }]}>{message}</Text> : null}
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -272,6 +307,5 @@ const styles = StyleSheet.create({
   examRowMeta: { fontSize: 11, fontWeight: '600' },
   emptyExams: { fontSize: 12, fontWeight: '600' },
   difficultyHint: { alignSelf: 'center', fontSize: 12, fontWeight: '600' },
-  message: { fontSize: 13, fontWeight: '700', lineHeight: 18, paddingVertical: KodaSpacing.sm },
   pressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
 });

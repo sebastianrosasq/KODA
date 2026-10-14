@@ -13,9 +13,10 @@ KODA transforma fechas de evaluación, temas pendientes y horas disponibles en u
 | Organización | Listo | Cursos, exámenes, temas, disponibilidad y un plan explicable. |
 | Catálogo curricular | En crecimiento | Instituciones indexadas, mallas oficiales contrastadas y registro inicial solo con ciclos completos; Continental se incorpora con su plan oficial. |
 | Calendario académico | En crecimiento | 9 periodos 2026 con 34 eventos oficiales de matrícula, clases y evaluaciones. |
-| Repaso | Listo | Flashcards propias por curso y dominio acumulado. |
+| Repaso | Listo | Flashcards propias, generación inicial por curso, PDF directo a 8 tarjetas y dominio acumulado. |
 | Seguimiento | Listo | Avance por curso, riesgos próximos y recordatorios locales semanales. |
-| IA, materiales y simulacros | Listo | PDFs y audios privados, análisis con Gemini, chat con contexto e historial por cuenta y simulacros; la clave de Gemini permanece solo en Supabase. |
+| IA, materiales y simulacros | Listo | PDFs y audios privados con cantidad de tarjetas elegible (1–6), PDF directo a 8 tarjetas, chat útil aun sin material, historial por cuenta y simulacros; la clave de Gemini permanece solo en Supabase. |
+| Perfil | Listo | Foto privada de perfil, preferencias, recordatorios, exportación y eliminación de cuenta. |
 | Privacidad de cuenta | En cierre de release | Exportación JSON, eliminación definitiva de cuenta y materiales privados; falta publicar las páginas legales en una URL HTTPS. |
 
 ## Cómo se conecta todo

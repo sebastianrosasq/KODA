@@ -65,6 +65,7 @@ export type StudyDocument = {
   originalFilename: string;
   contentKind: StudyMaterialKind;
   documentRole: StudyDocumentRole;
+  flashcardTarget: number;
   analysisStatus: 'ready' | 'processing' | 'completed' | 'failed';
   analysis: StudyDocumentAnalysis | null;
   flashcardsImportedAt: string | null;
@@ -88,6 +89,7 @@ type StudyDocumentRow = {
   original_filename: string;
   content_kind: StudyMaterialKind;
   document_role?: StudyDocumentRole;
+  flashcard_target?: number;
   analysis_status: StudyDocument['analysisStatus'];
   analysis: unknown;
   flashcards_imported_at: string | null;
@@ -147,7 +149,7 @@ function asSyllabus(value: unknown) {
   return units.length || calendarEvents.length ? { units, calendarEvents } : undefined;
 }
 
-export function asStudyDocumentAnalysis(value: unknown): StudyDocumentAnalysis | null {
+export function asStudyDocumentAnalysis(value: unknown, flashcardTarget = 8): StudyDocumentAnalysis | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
   const title = asText(candidate.title, 160);
@@ -161,7 +163,7 @@ export function asStudyDocumentAnalysis(value: unknown): StudyDocumentAnalysis |
       const question = asText(candidateCard.question, 800);
       const answer = asText(candidateCard.answer, 1200);
       return question && answer ? [{ question, answer }] : [];
-    }).slice(0, 8)
+    }).slice(0, Math.max(1, Math.min(8, flashcardTarget)))
     : [];
   const quizQuestions = Array.isArray(candidate.quizQuestions)
     ? candidate.quizQuestions.flatMap((quiz) => {
@@ -199,8 +201,9 @@ function mapDocument(row: StudyDocumentRow, courseKeyById: Map<string, string>):
     originalFilename: row.original_filename,
     contentKind: row.content_kind,
     documentRole: row.document_role === 'syllabus' ? 'syllabus' : 'study_material',
+    flashcardTarget: Math.max(1, Math.min(8, row.flashcard_target ?? 3)),
     analysisStatus: row.analysis_status,
-    analysis: asStudyDocumentAnalysis(row.analysis),
+    analysis: asStudyDocumentAnalysis(row.analysis, row.flashcard_target ?? 3),
     flashcardsImportedAt: row.flashcards_imported_at,
     lastError: row.last_error,
     createdAt: row.created_at,
@@ -234,10 +237,14 @@ async function getDatabaseCourseId(clientCourseId: string) {
   return databaseCourseId;
 }
 
-function readAsset(asset: DocumentPickerAsset) {
-  // En Android/Hermes Blob no admite ArrayBuffer como parte. Expo File implementa
-  // Blob directamente y transmite el binario sin convertirlo a memoria de JS.
-  return asset.file ?? new File(asset.uri);
+async function readAsset(asset: DocumentPickerAsset) {
+  const file = new File(asset.uri);
+  const bytes = await file.bytes();
+  // Supabase Storage recomienda ArrayBuffer en React Native. Con Expo 57 evitar
+  // Blob/File es importante: el runtime nativo no puede construir Blob desde un
+  // ArrayBuffer al serializar la subida.
+  const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  return { file, body };
 }
 
 function getAssetDescriptor(asset: DocumentPickerAsset) {
@@ -289,7 +296,7 @@ export async function listStudyDocuments() {
   const [{ data, error }, { clientKeyByDatabaseId }] = await Promise.all([
     client
       .from('student_study_documents')
-      .select('id, course_id, original_filename, content_kind, document_role, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
+      .select('id, course_id, original_filename, content_kind, document_role, flashcard_target, analysis_status, analysis, flashcards_imported_at, last_error, created_at')
       .order('created_at', { ascending: false }),
     getCourseReferences(),
   ]);
@@ -321,7 +328,17 @@ export async function recordAiDocumentConsent() {
   if (error) throw new Error(error.message);
 }
 
-export async function uploadStudyDocument({ asset, courseId, role = 'study_material' }: { asset: DocumentPickerAsset; courseId: string; role?: StudyDocumentRole }) {
+export async function uploadStudyDocument({
+  asset,
+  courseId,
+  role = 'study_material',
+  flashcardTarget = 3,
+}: {
+  asset: DocumentPickerAsset;
+  courseId: string;
+  role?: StudyDocumentRole;
+  flashcardTarget?: number;
+}) {
   const client = clientOrThrow();
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError || !userData.user) throw new Error('Inicia sesión para guardar un material.');
@@ -329,7 +346,8 @@ export async function uploadStudyDocument({ asset, courseId, role = 'study_mater
   if (role === 'syllabus' && descriptor.kind !== 'pdf') throw new Error('El sílabo debe subirse como PDF.');
   const databaseCourseId = await getDatabaseCourseId(courseId);
 
-  const file = readAsset(asset);
+  const target = Math.max(1, Math.min(8, Math.round(flashcardTarget)));
+  const { file, body } = await readAsset(asset);
   if (!file.size || file.size > MAX_STUDY_MATERIAL_BYTES) throw new Error('El PDF o audio debe pesar como máximo 12 MB.');
 
   const storagePath = createStoragePath(userData.user.id, descriptor.extension);
@@ -343,13 +361,14 @@ export async function uploadStudyDocument({ asset, courseId, role = 'study_mater
       mime_type: descriptor.mimeType,
       content_kind: descriptor.kind,
       document_role: role,
+      flashcard_target: target,
       byte_size: file.size,
     })
     .select('id')
     .single();
   if (documentError || !document) throw new Error(documentError?.message ?? 'No se pudo preparar el documento.');
 
-  const { error: uploadError } = await client.storage.from(DOCUMENT_BUCKET).upload(storagePath, file, {
+  const { error: uploadError } = await client.storage.from(DOCUMENT_BUCKET).upload(storagePath, body, {
     contentType: descriptor.mimeType,
     upsert: false,
   });
@@ -364,7 +383,7 @@ export async function uploadStudyDocument({ asset, courseId, role = 'study_mater
   return { documentId: document.id };
 }
 
-export async function analyzeStudyDocument(documentId: string) {
+export async function analyzeStudyDocument(documentId: string, flashcardTarget = 8) {
   const { data, error } = await clientOrThrow().functions.invoke('analyze-study-document', {
     body: { documentId },
   });
@@ -372,7 +391,7 @@ export async function analyzeStudyDocument(documentId: string) {
     const message = await friendlyFunctionError(error, 'No se pudo analizar el material.');
     throw new Error(message || 'No se pudo analizar el material.');
   }
-  const analysis = asStudyDocumentAnalysis((data as { analysis?: unknown } | null)?.analysis);
+  const analysis = asStudyDocumentAnalysis((data as { analysis?: unknown } | null)?.analysis, flashcardTarget);
   if (!analysis) throw new Error('La IA no devolvió un análisis utilizable.');
   return analysis;
 }

@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { type ReactNode } from 'react';
 import {
   Pressable,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -295,7 +296,7 @@ export function KodaProgressBar({
   );
 }
 
-export function KodaAvatar({ initials, size = 42 }: { initials: string; size?: number }) {
+export function KodaAvatar({ initials, imageUri, size = 42 }: { initials: string; imageUri?: string | null; size?: number }) {
   const { theme } = useKodaTheme();
 
   return (
@@ -310,7 +311,11 @@ export function KodaAvatar({ initials, size = 42 }: { initials: string; size?: n
           backgroundColor: theme.accentSoft,
         },
       ]}>
-      <Text style={[styles.avatarLabel, { color: theme.accent }]}>{initials}</Text>
+      {imageUri ? (
+        <Image accessibilityLabel={'Foto de perfil de ' + initials} source={{ uri: imageUri }} style={[styles.avatarImage, { borderRadius: size / 2, height: size, width: size }]} />
+      ) : (
+        <Text style={[styles.avatarLabel, { color: theme.accent }]}>{initials}</Text>
+      )}
     </View>
   );
 }
@@ -362,6 +367,7 @@ const styles = StyleSheet.create({
   headerCopy: {
     flex: 1,
     gap: KodaSpacing.xs,
+    minWidth: 0,
   },
   eyebrow: {
     fontSize: 12,
@@ -381,18 +387,24 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   sectionTitle: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
+    gap: KodaSpacing.sm,
     justifyContent: 'space-between',
   },
   sectionHeading: {
+    flex: 1,
     fontSize: 19,
     fontWeight: '800',
     letterSpacing: -0.3,
+    lineHeight: 24,
+    minWidth: 0,
   },
   sectionAction: {
     fontSize: 14,
     fontWeight: '800',
+    lineHeight: 20,
+    paddingTop: 2,
   },
   button: {
     minHeight: 48,
@@ -428,10 +440,12 @@ const styles = StyleSheet.create({
     borderRadius: KodaRadius.pill,
     borderWidth: 1,
     minHeight: 34,
+    maxWidth: '100%',
     justifyContent: 'center',
     paddingHorizontal: KodaSpacing.md,
   },
   pillLabel: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -451,6 +465,9 @@ const styles = StyleSheet.create({
   avatarLabel: {
     fontSize: 14,
     fontWeight: '900',
+  },
+  avatarImage: {
+    resizeMode: 'cover',
   },
   bodyText: {
     fontSize: 15,

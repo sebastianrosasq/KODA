@@ -23,7 +23,7 @@ const welcomeMessage: CoachMessage = {
 };
 
 function CoachMessageText({ message, color }: { message: CoachMessage; color: string }) {
-  const fragments = message.text.replaceAll('**', '').split(/(\*[^*]+\*)/g);
+  const fragments = message.text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
 
   return (
     <Text style={[styles.messageText, { color, fontWeight: message.role === 'student' ? '700' : '500' }]}>
@@ -158,7 +158,7 @@ export default function CoachScreen() {
       <KodaPageHeader
         eyebrow="KODA IA"
         title="Tu compañero de repaso"
-        subtitle="Las respuestas usan tu material seleccionado cuando esté disponible. Tu historial queda en tu cuenta y puedes borrarlo cuando quieras."
+        subtitle="Puedes preguntar sin subir nada; un material solo añade contexto específico. Tu historial queda en tu cuenta."
         right={
           <View style={styles.headerActions}>
             {messages.length > 1 ? <KodaIconButton icon="trash-outline" label={isClearingHistory ? 'Limpiando historial' : 'Limpiar historial'} onPress={isClearingHistory ? undefined : confirmClearHistory} style={isClearingHistory ? styles.disabledAction : undefined} /> : null}
@@ -196,7 +196,7 @@ export default function CoachScreen() {
           </View>
         )}
         {!isLoading && !analyzedDocuments.length ? (
-          <Text style={[styles.contextHint, { color: theme.textTertiary }]}>Sube un PDF o audio desde Materiales para hacer preguntas directamente sobre él.</Text>
+          <Text style={[styles.contextHint, { color: theme.textTertiary }]}>Opcional: sube un material si quieres respuestas basadas en tus apuntes.</Text>
         ) : null}
       </View>
 

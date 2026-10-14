@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
@@ -18,6 +19,7 @@ import {
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { getStudyReminderStatus, scheduleStudyReminders, type StudyReminderStatus } from '@/features/reminders/study-reminders';
+import { uploadProfileAvatar } from '@/features/profile/profile-avatar';
 import { deleteKodaAccount, exportKodaPersonalData } from '@/features/privacy/account-privacy';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaAuth } from '@/providers/koda-auth-provider';
@@ -26,7 +28,7 @@ import { useKodaTheme } from '@/providers/koda-theme-provider';
 
 export default function ProfileScreen() {
   const { colorScheme, theme, toggleColorScheme } = useKodaTheme();
-  const { workspace, addCourse, clearLocalWorkspace, removeCourse, setCourseActive, syncError, syncState } = useKodaData();
+  const { workspace, addCourse, clearLocalWorkspace, removeCourse, setCourseActive, syncError, syncState, updateProfile } = useKodaData();
   const { isConfigured, session, status, signOut } = useKodaAuth();
   const [isAcademicModalVisible, setAcademicModalVisible] = useState(false);
   const [isAccountModalVisible, setAccountModalVisible] = useState(false);
@@ -37,6 +39,7 @@ export default function ProfileScreen() {
   const [privacyMessage, setPrivacyMessage] = useState<string | null>(null);
   const [isExportingData, setExportingData] = useState(false);
   const [isDeletingAccount, setDeletingAccount] = useState(false);
+  const [isUpdatingAvatar, setUpdatingAvatar] = useState(false);
   const isDark = colorScheme === 'dark';
   const termLabel = getCatalogProgram(workspace.profile.institutionSlug, workspace.profile.programSlug)?.termLabel ?? 'Ciclo';
 
@@ -58,6 +61,26 @@ export default function ProfileScreen() {
   const submitCourse = () => {
     addCourse(newCourseName);
     setNewCourseName('');
+  };
+
+  const chooseAvatar = async () => {
+    if (isUpdatingAvatar) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.82,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      setUpdatingAvatar(true);
+      const avatar = await uploadProfileAvatar(result.assets[0]);
+      updateProfile({ ...workspace.profile, avatarPath: avatar.path, avatarUrl: avatar.url ?? undefined });
+    } catch (error) {
+      Alert.alert('No se pudo actualizar la foto', error instanceof Error ? error.message : 'Elige otra foto e inténtalo nuevamente.');
+    } finally {
+      setUpdatingAvatar(false);
+    }
   };
 
   const updateReminders = async () => {
@@ -139,7 +162,18 @@ export default function ProfileScreen() {
 
       <KodaReveal delay={45}>
         <KodaCard style={styles.profileCard}>
-          <KodaAvatar initials={workspace.profile.displayName.slice(0, 2).toUpperCase()} size={58} />
+          <Pressable
+            accessibilityLabel={isUpdatingAvatar ? 'Actualizando foto de perfil' : 'Cambiar foto de perfil'}
+            accessibilityRole="button"
+            disabled={isUpdatingAvatar}
+            onPress={() => void chooseAvatar()}
+            style={({ pressed }) => [styles.avatarControl, pressed && !isUpdatingAvatar && styles.pressed]}
+          >
+            <KodaAvatar imageUri={workspace.profile.avatarUrl} initials={workspace.profile.displayName.slice(0, 2).toUpperCase()} size={58} />
+            <View style={[styles.avatarEditBadge, { backgroundColor: theme.accent, borderColor: theme.surface }]}>
+              <Ionicons color={theme.onAccent} name={isUpdatingAvatar ? 'hourglass-outline' : 'camera-outline'} size={12} />
+            </View>
+          </Pressable>
           <View style={styles.profileCopy}>
             <Text style={[styles.name, { color: theme.text }]}>{workspace.profile.displayName}</Text>
             <Text style={[styles.institution, { color: theme.textSecondary }]}>{workspace.profile.institutionName}</Text>
@@ -404,6 +438,8 @@ function getToneColor(tone: 'plum' | 'mint' | 'amber' | 'sky', theme: ReturnType
 
 const styles = StyleSheet.create({
   profileCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.lg, padding: KodaSpacing.xl },
+  avatarControl: { position: 'relative' },
+  avatarEditBadge: { alignItems: 'center', borderRadius: 12, borderWidth: 2, bottom: -2, height: 24, justifyContent: 'center', position: 'absolute', right: -3, width: 24 },
   profileCopy: { flex: 1, gap: 3 },
   name: { fontSize: 20, fontWeight: '900', letterSpacing: -0.4 },
   institution: { fontSize: 13, fontWeight: '800' },
@@ -448,4 +484,5 @@ const styles = StyleSheet.create({
   institutionLockName: { fontSize: 14, fontWeight: '800' },
   authInput: { borderRadius: KodaRadius.md, borderWidth: 1, fontSize: 16, minHeight: 50, paddingHorizontal: KodaSpacing.md },
   accountMessage: { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
 });

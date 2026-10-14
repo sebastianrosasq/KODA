@@ -1,4 +1,5 @@
 import { generateStudyPlan } from '@/features/planner/generate-study-plan';
+import { getProfileAvatarUrl } from '@/features/profile/profile-avatar';
 import { supabase } from '@/lib/supabase';
 import type {
   CourseTone,
@@ -17,6 +18,7 @@ type RemoteCurriculumProfile = {
 type RemoteStudentProfile = {
   display_name: string;
   academic_profile_completed: boolean;
+  avatar_path: string | null;
 };
 
 type RemoteCourse = {
@@ -182,6 +184,7 @@ export async function syncWorkspaceToSupabase(userId: string, workspace: KodaWor
     display_name: workspace.profile.displayName.trim() || 'Estudiante',
     timezone: 'America/Lima',
     academic_profile_completed: workspace.academicProfileCompleted,
+    avatar_path: workspace.profile.avatarPath ?? null,
   });
   throwIfError(accountError);
 
@@ -385,7 +388,7 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
 
   const profile = curriculumProfile as RemoteCurriculumProfile;
   const [{ data: account, error: accountError }, { data: institution, error: institutionError }, { data: program, error: programError }] = await Promise.all([
-    client.from('student_profiles').select('display_name, academic_profile_completed').eq('id', userId).maybeSingle(),
+    client.from('student_profiles').select('display_name, academic_profile_completed, avatar_path').eq('id', userId).maybeSingle(),
     profile.institution_id
       ? client.from('curriculum_institutions').select('slug, name').eq('id', profile.institution_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -397,8 +400,20 @@ export async function loadWorkspaceFromSupabase(userId: string, fallback: KodaWo
   throwIfError(institutionError);
   throwIfError(programError);
 
+  const avatarPath = typeof account?.avatar_path === 'string' ? account.avatar_path : undefined;
+  let avatarUrl: string | undefined;
+  if (avatarPath) {
+    try {
+      avatarUrl = await getProfileAvatarUrl(avatarPath) ?? undefined;
+    } catch (error) {
+      console.warn('No se pudo recuperar la foto de perfil', error);
+    }
+  }
+
   const remoteProfile: StudentAcademicProfile = {
     displayName: account?.display_name ?? fallback.profile.displayName,
+    avatarPath,
+    avatarUrl,
     institutionSlug: institution?.slug ?? fallback.profile.institutionSlug,
     institutionName: institution?.name ?? fallback.profile.institutionName,
     programSlug: program?.slug ?? fallback.profile.programSlug,

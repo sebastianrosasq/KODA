@@ -198,7 +198,7 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.miniProfile}>
-        <KodaAvatar initials={workspace.profile.displayName.slice(0, 2).toUpperCase()} />
+          <KodaAvatar imageUri={workspace.profile.avatarUrl} initials={workspace.profile.displayName.slice(0, 2).toUpperCase()} />
         <View style={styles.miniProfileCopy}>
           <KodaText style={styles.miniProfileTitle}>{workspace.profile.institutionName}</KodaText>
           <KodaText tone="secondary" style={styles.miniProfileSubtitle}>

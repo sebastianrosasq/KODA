@@ -36,6 +36,7 @@ export default function MaterialsScreen() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [uploadRole, setUploadRole] = useState<StudyDocumentRole>('study_material');
+  const [flashcardTarget, setFlashcardTarget] = useState(3);
   const selectedCourseId = courses.some((course) => course.id === courseId) ? courseId : courses[0]?.id ?? '';
 
   const loadDocuments = useCallback(async () => {
@@ -105,7 +106,12 @@ export default function MaterialsScreen() {
     try {
       setLoading(true);
       setFeedback(null);
-      const { documentId } = await uploadStudyDocument({ asset: result.assets[0], courseId: selectedCourseId, role: uploadRole });
+      const { documentId } = await uploadStudyDocument({
+        asset: result.assets[0],
+        courseId: selectedCourseId,
+        role: uploadRole,
+        flashcardTarget: uploadRole === 'study_material' ? flashcardTarget : 3,
+      });
       await loadDocuments();
       if (!hasConsent) {
         setFeedback(uploadRole === 'syllabus'
@@ -115,7 +121,7 @@ export default function MaterialsScreen() {
       }
 
       try {
-        await analyzeStudyDocument(documentId);
+        await analyzeStudyDocument(documentId, uploadRole === 'study_material' ? flashcardTarget : 3);
         await loadDocuments();
         setFeedback(uploadRole === 'syllabus'
           ? 'Sílabo analizado. Revisa la agenda sugerida y decide si quieres aplicarla.'
@@ -155,7 +161,7 @@ export default function MaterialsScreen() {
     }
     try {
       setRetryingId(document.id);
-      await analyzeStudyDocument(document.id);
+      await analyzeStudyDocument(document.id, document.flashcardTarget);
       await loadDocuments();
       setFeedback('Análisis listo. Ya puedes revisar el resumen, guardar tarjetas o practicar.');
     } catch (error) {
@@ -258,8 +264,18 @@ export default function MaterialsScreen() {
         <View style={styles.pills}>
           {courses.map((course) => <KodaPill key={course.id} label={course.name} selected={course.id === selectedCourseId} onPress={() => setCourseId(course.id)} />)}
         </View>
+        {uploadRole === 'study_material' ? (
+          <>
+            <Text style={[styles.countLabel, { color: theme.textSecondary }]}>TARJETAS QUE QUIERES GENERAR</Text>
+            <View style={styles.pills}>
+              {Array.from({ length: 6 }, (_, index) => index + 1).map((count) => (
+                <KodaPill key={count} label={String(count)} selected={flashcardTarget === count} onPress={() => setFlashcardTarget(count)} />
+              ))}
+            </View>
+          </>
+        ) : null}
         <KodaButton disabled={isLoading || status !== 'signed_in' || !selectedCourseId} icon="cloud-upload-outline" label={isLoading ? 'Guardando…' : uploadRole === 'syllabus' ? 'Elegir sílabo PDF · hasta 12 MB' : 'Elegir PDF o audio · hasta 12 MB'} onPress={() => void chooseAndUpload()} />
-        <Text style={[styles.limitText, { color: theme.textTertiary }]}>{uploadRole === 'syllabus' ? 'KODA identifica unidades, temas, evaluaciones y actividades. Tú decides si aplicas su agenda.' : 'Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Límite diario de IA: 3 PDFs y 5 audios.'}</Text>
+        <Text style={[styles.limitText, { color: theme.textTertiary }]}>{uploadRole === 'syllabus' ? 'KODA identifica unidades, temas, evaluaciones y actividades. Tú decides si aplicas su agenda.' : `Generará ${flashcardTarget} tarjetas revisables (máximo 6). Formatos: PDF, MP3, WAV, M4A, AAC, OGG, FLAC y WEBM. Límite diario de IA: 3 PDFs y 5 audios.`}</Text>
         {feedback ? <Text style={[styles.feedbackText, { color: theme.textSecondary }]}>{feedback}</Text> : null}
       </View>
 
@@ -392,6 +408,7 @@ const styles = StyleSheet.create({
   sectionBlock: { gap: KodaSpacing.md },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: KodaSpacing.sm },
   limitText: { fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  countLabel: { fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
   feedbackText: { fontSize: 12, fontWeight: '700', lineHeight: 18 },
   documentCard: { gap: KodaSpacing.lg, padding: KodaSpacing.lg },
   documentHeader: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md },

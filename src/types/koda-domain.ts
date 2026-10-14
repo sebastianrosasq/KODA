@@ -2,6 +2,8 @@ export type CourseTone = 'plum' | 'mint' | 'amber' | 'sky';
 
 export type StudentAcademicProfile = {
   displayName: string;
+  avatarPath?: string;
+  avatarUrl?: string;
   institutionSlug: string;
   institutionName: string;
   programSlug: string;

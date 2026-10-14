@@ -4,9 +4,21 @@ Actualizado: 14 de octubre de 2026. Esta es una decisión de producto, no un che
 
 ## Decisión
 
-KODA empieza como un producto **B2C freemium** para estudiantes de educación superior en Perú. La versión gratis debe resolver el problema completo de organizar y estudiar: carrera/ciclo, plan, recordatorios, flashcards manuales, simulacros, chat de estudio y análisis con los límites operativos actuales (3 PDF y 5 audios por día).
+KODA empieza como un producto **B2C freemium** para estudiantes de educación superior en Perú. La versión gratis debe resolver el problema completo de organizar y estudiar: carrera/ciclo, plan, recordatorios, flashcards manuales, simulacros y chat de estudio. No habrá publicidad invasiva ni venta de datos personales.
 
-La primera oferta pagada a validar es **KODA Plus a S/ 9.90/mes** o **S/ 79.90/año**. Antes de cobrar, se probará con una lista de espera y entrevistas; el precio es una hipótesis, no una promesa al usuario. Plus desbloquearía analítica avanzada de preparación, más capacidad de procesamiento de materiales según costos reales, reportes exportables y simulacros reforzados. No se promete IA “ilimitada”: esa frase no protege el costo ni comunica un uso justo.
+La primera oferta pagada a validar es **KODA Plus a S/ 9.90/mes** o **S/ 79.90/año**. Antes de cobrar, se probará con una lista de espera y entrevistas; el precio es una hipótesis, no una promesa al usuario. No se promete IA “ilimitada”: esa frase no protege el costo ni comunica un uso justo.
+
+## Qué queda gratis y qué sería Plus
+
+| Área | Gratis durante beta | Propuesta KODA Plus que se validará |
+| --- | --- | --- |
+| Organización | Carrera/ciclo, cursos, agenda, exámenes, temas, bloques y recordatorios. | Plan adaptativo: detección de semanas de riesgo, redistribución sugerida y comparativo de carga. |
+| Repaso | Flashcards manuales, repaso espaciado y simulacros desde tarjetas. | Simulacros por objetivo, historial de errores por tema y reportes exportables. |
+| Chat IA | Chat de repaso directo, sin límite de mensajes impuesto por KODA en la beta. | Modos guiados de examen, explicación paso a paso y seguimiento de objetivos; no una respuesta más larga sin valor. |
+| Materiales | El límite actual de beta: 3 PDF y 5 audios analizados por día, más sílabos con agenda revisable. | Bolsas mensuales de análisis claramente mostradas antes de comprar y capacidad adicional definida después de medir costo real. Nunca “IA ilimitada”. |
+| Datos | Sin anuncios y sin venta de datos. Exportación y eliminación de cuenta. | Lo mismo: pagar no cambia la privacidad. |
+
+Los límites de beta no constituyen una promesa comercial permanente. Antes del lanzamiento pagado se publicará un límite mensual, el costo por material y una política de uso justo. La funcionalidad esencial para organizarse y estudiar no se bloquea tras un pago.
 
 ## Por qué este modelo
 
@@ -20,14 +32,18 @@ La oportunidad diferencial de KODA no es vender tarjetas genéricas: es traducir
 
 No se venderán datos personales, historiales, archivos, notas individuales ni perfiles de estudiantes a universidades. La vía B2B futura es una **licencia institucional opcional**, contratada por la institución y con consentimiento explícito del alumno para cualquier dato adicional. Los reportes agregados deben tener umbral mínimo de cohorte, no incluir identificadores y pasar revisión legal de protección de datos antes de publicarse.
 
-## Pasarela y arquitectura antes de vender
+## Cobro y arquitectura antes de vender
 
-No se debe activar un botón de pago hasta contar con RUC/entidad cobradora, términos de suscripción y reembolsos, política de privacidad actualizada, soporte y un proveedor contratado. Para Perú, Izipay Online declara integración para tarjetas Visa, Mastercard, Amex y Diners, documentación para web/app y abonos al siguiente día útil; se evaluará junto con otra pasarela local en un proceso comercial, no se asumirá una comisión sin cotización vigente. [Izipay Online](https://www.izipay.pe/izipay-online/)
+No se debe activar un botón de pago hasta contar con RUC/entidad cobradora, términos de suscripción y reembolsos, política de privacidad actualizada, soporte y un proveedor contratado.
+
+Para la APK distribuida por Google Play, Plus es una suscripción digital y se debe cobrar con **Google Play Billing**: Google exige ese sistema para funciones y suscripciones digitales vendidas dentro de una app distribuida por Play. [Política de pagos de Google Play](https://support.google.com/googleplay/android-developer/answer/10281818?hl=en-en) La app no debe enlazar una pasarela externa desde ese flujo peruano sin revisar los programas y regiones que Google permita en ese momento.
+
+Para una web independiente, Izipay es una alternativa local a cotizar: sus canales oficiales documentan tarjetas y métodos como Yape/Plin, pero requiere afiliación, credenciales y condiciones comerciales vigentes. [Izipay Developers](https://developers.izipay.pe/api/) No se asume una comisión ni se guarda una tarjeta en Supabase.
 
 Cuando exista esa autorización, la implementación seguirá este orden:
 
 1. Tablas `billing_customers`, `subscriptions`, `payment_events` y `entitlements`; nunca guardar números de tarjeta en Supabase.
-2. Checkout alojado por la pasarela, identificador de compra idempotente y webhook con verificación de firma en una Edge Function.
+2. Google Play Billing para la APK y, solo en web, checkout alojado por una pasarela aprobada; cada compra lleva identificador idempotente y webhook con verificación de firma en una Edge Function.
 3. El webhook, no la aplicación móvil, concede o revoca `entitlements`.
 4. Pantalla de estado, cancelación, comprobante y soporte; pruebas de pago aprobado, rechazado, duplicado, reembolso y renovación.
 5. Publicar solo después de medición de conversión, costo de IA por usuario y revisión legal/tributaria.

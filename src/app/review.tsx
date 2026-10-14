@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -16,20 +17,25 @@ import {
 } from '@/components/koda-ui';
 import { KodaRadius, KodaSpacing } from '@/constants/koda-theme';
 import { generateCourseFlashcards } from '@/features/ai/study-coach';
+import { analyzeStudyDocument, getAiDocumentConsent, markDocumentFlashcardsImported, uploadStudyDocument } from '@/features/ai/study-documents';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { useKodaData } from '@/providers/koda-data-provider';
+import { useKodaAuth } from '@/providers/koda-auth-provider';
 import { useKodaTheme } from '@/providers/koda-theme-provider';
 import type { CourseTone } from '@/types/koda-domain';
 
 export default function ReviewScreen() {
   const { theme } = useKodaTheme();
   const { workspace, addFlashcard, addFlashcards, reviewFlashcard } = useKodaData();
+  const { status } = useKodaAuth();
   const [showAnswer, setShowAnswer] = useState(false);
   const [cardOffset, setCardOffset] = useState(0);
   const [isCreateVisible, setCreateVisible] = useState(false);
   const [createCourseId, setCreateCourseId] = useState<string | undefined>();
   const [generatingCourseId, setGeneratingCourseId] = useState<string | null>(null);
   const [generationFeedback, setGenerationFeedback] = useState<string | null>(null);
+  const [isPdfVisible, setPdfVisible] = useState(false);
+  const [isPdfGenerating, setPdfGenerating] = useState(false);
   const pendingCards = useMemo(
     () => workspace.flashcards.slice().sort((left, right) => left.mastery - right.mastery),
     [workspace.flashcards],
@@ -66,6 +72,40 @@ export default function ReviewScreen() {
     }
   };
 
+  const generatePdfDeck = async (courseId: string) => {
+    if (status !== 'signed_in') {
+      Alert.alert('Inicia sesión', 'Necesitas una cuenta para guardar el PDF y sus flashcards.');
+      return;
+    }
+    try {
+      const hasConsent = await getAiDocumentConsent();
+      if (!hasConsent) {
+        Alert.alert('Confirma el uso de IA', 'Acepta el aviso de IA en Materiales una sola vez antes de generar tarjetas desde un PDF.');
+        return;
+      }
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets[0]) return;
+
+      setPdfGenerating(true);
+      const courseName = workspace.courses.find((course) => course.id === courseId)?.name ?? 'tu curso';
+      const { documentId } = await uploadStudyDocument({ asset: result.assets[0], courseId, flashcardTarget: 8 });
+      const analysis = await analyzeStudyDocument(documentId, 8);
+      if (analysis.flashcards.length < 8) throw new Error('KODA no pudo crear las 8 tarjetas solicitadas. Prueba con otro PDF más legible.');
+      addFlashcards(analysis.flashcards.map((card) => ({ courseId, prompt: card.question, answer: card.answer })));
+      await markDocumentFlashcardsImported(documentId);
+      setPdfVisible(false);
+      Alert.alert('8 tarjetas listas', `Las tarjetas de ${courseName} ya están en tu mazo. El PDF y su análisis también quedaron guardados en Materiales.`);
+    } catch (error) {
+      Alert.alert('No se pudieron crear las tarjetas', error instanceof Error ? error.message : 'Intenta nuevamente con otro PDF.');
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
   return (
     <KodaScreen>
       <KodaPageHeader
@@ -83,6 +123,17 @@ export default function ReviewScreen() {
           <Text style={[styles.streakValue, { color: theme.text }]}>{pendingCards.filter((item) => item.mastery < 3).length} tarjetas por reforzar</Text>
           <Text style={[styles.streakText, { color: theme.textSecondary }]}>Una respuesta honesta hace que la siguiente sesión sea mejor.</Text>
         </View>
+      </KodaCard>
+
+      <KodaCard style={[styles.pdfCard, { backgroundColor: theme.accentSoft, borderColor: theme.accentSoft }]}>
+        <View style={[styles.pdfIcon, { backgroundColor: theme.surface }]}>
+          <Ionicons color={theme.accent} name="document-text-outline" size={20} />
+        </View>
+        <View style={styles.pdfCopy}>
+          <Text style={[styles.pdfTitle, { color: theme.text }]}>PDF a 8 flashcards</Text>
+          <Text style={[styles.pdfDetail, { color: theme.textSecondary }]}>Elige un curso y transforma un PDF propio en práctica concreta.</Text>
+        </View>
+        <KodaButton disabled={isPdfGenerating} icon="sparkles-outline" label={isPdfGenerating ? 'Generando…' : 'Generar'} onPress={() => setPdfVisible(true)} variant="secondary" />
       </KodaCard>
 
       <View style={styles.sectionBlock}>
@@ -168,6 +219,7 @@ export default function ReviewScreen() {
       </KodaCard>
 
       {isCreateVisible ? <FlashcardModal initialCourseId={createCourseId} onClose={() => setCreateVisible(false)} onCreate={addFlashcard} /> : null}
+      {isPdfVisible ? <PdfFlashcardsModal isGenerating={isPdfGenerating} onClose={() => setPdfVisible(false)} onGenerate={(courseId) => void generatePdfDeck(courseId)} /> : null}
     </KodaScreen>
   );
 }
@@ -229,6 +281,49 @@ function FlashcardModal({ initialCourseId, onClose, onCreate }: { initialCourseI
   );
 }
 
+function PdfFlashcardsModal({
+  isGenerating,
+  onClose,
+  onGenerate,
+}: {
+  isGenerating: boolean;
+  onClose: () => void;
+  onGenerate: (courseId: string) => void;
+}) {
+  const { theme } = useKodaTheme();
+  const reducedMotion = useReducedMotion();
+  const { workspace } = useKodaData();
+  const availableCourses = workspace.courses.filter((course) => course.isActive);
+  const [courseId, setCourseId] = useState(availableCourses[0]?.id ?? '');
+
+  return (
+    <Modal animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={onClose} transparent visible>
+      <Pressable accessibilityLabel="Cerrar generación desde PDF" onPress={isGenerating ? undefined : onClose} style={[styles.modalOverlay, { backgroundColor: theme.overlay + '99' }]}>
+        <Pressable onPress={() => undefined} style={[styles.modalCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderCopy}>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Genera 8 flashcards</Text>
+                <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>KODA analizará un PDF propio y guardará ocho preguntas con respuestas revisables.</Text>
+              </View>
+              <KodaIconButton icon="close" label="Cerrar" onPress={onClose} />
+            </View>
+            <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>CURSO</Text>
+            <View style={styles.pills}>
+              {availableCourses.map((course) => <KodaPill key={course.id} label={course.name} selected={course.id === courseId} onPress={() => setCourseId(course.id)} />)}
+            </View>
+            <View style={[styles.pdfNotice, { backgroundColor: theme.surfaceMuted }]}>
+              <Ionicons color={theme.accent} name="shield-checkmark-outline" size={18} />
+              <Text style={[styles.pdfNoticeText, { color: theme.textSecondary }]}>PDF hasta 12 MB. Se guardará privado en tu cuenta y consumirá uno de tus análisis de PDF del día.</Text>
+            </View>
+            <KodaButton disabled={isGenerating || !courseId} icon="document-attach-outline" label={isGenerating ? 'Analizando PDF…' : 'Elegir PDF y generar 8'} onPress={() => onGenerate(courseId)} />
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function toneColor(tone: CourseTone, theme: ReturnType<typeof useKodaTheme>['theme']) {
   return { plum: theme.accent, mint: theme.success, amber: theme.warning, sky: '#3284A6' }[tone];
 }
@@ -239,6 +334,11 @@ const styles = StyleSheet.create({
   streakCopy: { flex: 1, gap: 2 },
   streakValue: { fontSize: 15, fontWeight: '900' },
   streakText: { fontSize: 13, fontWeight: '600' },
+  pdfCard: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.md, padding: KodaSpacing.lg },
+  pdfIcon: { alignItems: 'center', borderRadius: KodaRadius.md, height: 42, justifyContent: 'center', width: 42 },
+  pdfCopy: { flex: 1, gap: 2, minWidth: 0 },
+  pdfTitle: { fontSize: 14, fontWeight: '900' },
+  pdfDetail: { fontSize: 12, fontWeight: '600', lineHeight: 17 },
   sectionBlock: { gap: KodaSpacing.md },
   flashcard: { gap: KodaSpacing.xl, justifyContent: 'space-between', minHeight: 270, padding: KodaSpacing.xl },
   cardTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -283,4 +383,6 @@ const styles = StyleSheet.create({
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: KodaSpacing.sm },
   input: { borderRadius: KodaRadius.md, borderWidth: 1, fontSize: 15, fontWeight: '600', minHeight: 74, padding: KodaSpacing.md, textAlignVertical: 'top' },
   answerInput: { minHeight: 108 },
+  pdfNotice: { alignItems: 'flex-start', borderRadius: KodaRadius.md, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.md },
+  pdfNoticeText: { flex: 1, fontSize: 12, fontWeight: '600', lineHeight: 18 },
 });

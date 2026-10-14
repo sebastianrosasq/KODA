@@ -27,11 +27,12 @@ export default function PlanScreen() {
   const { completeSession, plan, removeExam, workspace } = useKodaData();
   const [selectedDay, setSelectedDay] = useState<DayLabel>('Hoy');
   const [isEditorVisible, setEditorVisible] = useState(false);
-  const [examNotice, setExamNotice] = useState<string | null>(null);
   const sessions = plan.filter((session) => session.day === selectedDay);
-  const totalMinutes = plan.reduce((sum, session) => sum + session.durationMinutes, 0);
+  const reservedMinutes = workspace.availability.reduce((sum, block) => sum + block.durationMinutes, 0);
+  const totalMinutes = plan.length ? plan.reduce((sum, session) => sum + session.durationMinutes, 0) : reservedMinutes;
   const completedSessions = plan.filter((session) => session.completed).length;
   const completion = plan.length ? Math.round((completedSessions / plan.length) * 100) : 0;
+  const hasAvailableBlocks = workspace.availability.length > 0;
   const upcomingExams = useMemo(
     () => workspace.exams
       .filter((exam) => getDaysUntilExam(exam.dateIso) >= 0)
@@ -55,7 +56,7 @@ export default function PlanScreen() {
           style: 'destructive',
           onPress: () => {
             removeExam(examId);
-            setExamNotice('Evento eliminado. Tu plan se reajustó.');
+            Alert.alert('Evento eliminado', 'Tu agenda y tus sesiones se reajustaron.');
           },
         },
       ],
@@ -80,10 +81,10 @@ export default function PlanScreen() {
               <Text style={[styles.summaryKicker, { color: theme.textSecondary }]}>CARGA DE ESTA SEMANA</Text>
               <Text style={[styles.summaryValue, { color: theme.text }]}>{formatMinutes(totalMinutes)}</Text>
             </View>
-            <View style={[styles.statusPill, { backgroundColor: completion >= 50 ? theme.successSoft : theme.warningSoft }]}>
-              <Ionicons color={completion >= 50 ? theme.success : theme.warning} name={completion >= 50 ? 'checkmark-circle' : 'time-outline'} size={15} />
-              <Text style={[styles.statusPillText, { color: completion >= 50 ? theme.success : theme.warning }]}>
-                {plan.length ? completion >= 50 ? 'En ritmo' : 'Por iniciar' : 'Sin plan'}
+            <View style={[styles.statusPill, { backgroundColor: plan.length ? completion >= 50 ? theme.successSoft : theme.warningSoft : hasAvailableBlocks ? theme.accentSoft : theme.warningSoft }]}>
+              <Ionicons color={plan.length ? completion >= 50 ? theme.success : theme.warning : hasAvailableBlocks ? theme.accent : theme.warning} name={plan.length && completion >= 50 ? 'checkmark-circle' : hasAvailableBlocks ? 'calendar-outline' : 'time-outline'} size={15} />
+              <Text style={[styles.statusPillText, { color: plan.length ? completion >= 50 ? theme.success : theme.warning : hasAvailableBlocks ? theme.accent : theme.warning }]}>
+                {plan.length ? completion >= 50 ? 'En ritmo' : 'Por iniciar' : hasAvailableBlocks ? 'Bloques listos' : 'Sin plan'}
               </Text>
             </View>
           </View>
@@ -91,7 +92,9 @@ export default function PlanScreen() {
           <KodaText tone="secondary" style={styles.summaryDescription}>
             {plan.length
               ? `${completedSessions} de ${plan.length} bloques completados. Puedes mover o añadir horas cuando tu semana cambie.`
-              : 'Registra tus exámenes, temas y horas disponibles para que KODA arme bloques realistas.'}
+              : hasAvailableBlocks
+                ? `${workspace.availability.length} bloques reservados por ${formatMinutes(reservedMinutes)}. Añade un tema o evaluación para que KODA priorice cada sesión.`
+                : 'Registra tus exámenes, temas y horas disponibles para que KODA arme bloques realistas.'}
           </KodaText>
         </KodaCard>
       </KodaReveal>
@@ -162,12 +165,6 @@ export default function PlanScreen() {
       <KodaReveal delay={180} style={styles.sectionBlock}>
         <KodaSectionTitle title="Próximas evaluaciones y actividades" action="Añadir" onActionPress={() => setEditorVisible(true)} />
         <Text style={[styles.sectionHint, { color: theme.textTertiary }]}>KODA prioriza las evaluaciones; las actividades quedan visibles en tu agenda.</Text>
-        {examNotice ? (
-          <View accessibilityLiveRegion="polite" style={[styles.examNotice, { backgroundColor: theme.successSoft }]}>
-            <Ionicons color={theme.success} name="checkmark-circle-outline" size={18} />
-            <Text style={[styles.examNoticeText, { color: theme.success }]}>{examNotice}</Text>
-          </View>
-        ) : null}
         {upcomingExams.length ? upcomingExams.map((exam) => {
           const course = workspace.courses.find((item) => item.id === exam.courseId);
           const daysUntil = getDaysUntilExam(exam.dateIso);
@@ -216,7 +213,10 @@ export default function PlanScreen() {
         )}
       </KodaReveal>
 
-      {isEditorVisible ? <PlanEditorModal onClose={() => setEditorVisible(false)} onExamAdded={(title) => setExamNotice(`${title} se añadió correctamente. Ya aparece en tu lista.`)} /> : null}
+      {isEditorVisible ? <PlanEditorModal onClose={() => setEditorVisible(false)} onExamAdded={(title) => {
+        setEditorVisible(false);
+        Alert.alert('Evaluación añadida', `${title} ya aparece en tus próximas evaluaciones.`);
+      }} /> : null}
     </KodaScreen>
   );
 }
@@ -286,8 +286,6 @@ const styles = StyleSheet.create({
   examActions: { alignItems: 'flex-end', gap: KodaSpacing.xs },
   examDays: { fontSize: 11, fontWeight: '900', textAlign: 'right' },
   deleteExamButton: { height: 34, width: 34 },
-  examNotice: { alignItems: 'center', borderRadius: KodaRadius.md, flexDirection: 'row', gap: KodaSpacing.sm, padding: KodaSpacing.md },
-  examNoticeText: { flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 },
   sectionHint: { fontSize: 12, fontWeight: '600', lineHeight: 17, marginTop: -KodaSpacing.sm },
   topicCard: { padding: KodaSpacing.md },
   topicRow: { alignItems: 'center', flexDirection: 'row', gap: KodaSpacing.sm, paddingVertical: KodaSpacing.sm },

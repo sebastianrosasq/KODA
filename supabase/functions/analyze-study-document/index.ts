@@ -19,7 +19,8 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
 };
 
-const studySchema = {
+function studySchema(flashcardCount: number) {
+  return {
   type: 'object',
   properties: {
     title: { type: 'string' },
@@ -27,6 +28,8 @@ const studySchema = {
     keyPoints: { type: 'array', items: { type: 'string' } },
     flashcards: {
       type: 'array',
+      minItems: flashcardCount,
+      maxItems: flashcardCount,
       items: {
         type: 'object',
         properties: {
@@ -51,7 +54,8 @@ const studySchema = {
     },
   },
   required: ['title', 'summary', 'keyPoints', 'flashcards', 'quizQuestions'],
-};
+  };
+}
 
 const syllabusSchema = {
   type: 'object',
@@ -79,6 +83,7 @@ type StudyDocument = {
   mime_type: string;
   content_kind: 'pdf' | 'audio';
   document_role?: 'study_material' | 'syllabus';
+  flashcard_target?: number;
   analysis_status: string;
   analysis: unknown;
 };
@@ -166,7 +171,7 @@ function normalizeSyllabus(value: unknown) {
   return units.length || calendarEvents.length ? { units, calendarEvents } : undefined;
 }
 
-function normalizeAnalysis(value: unknown, role: StudyDocument['document_role']) {
+function normalizeAnalysis(value: unknown, role: StudyDocument['document_role'], flashcardTarget: number) {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Record<string, unknown>;
   const title = asText(candidate.title, 160);
@@ -179,7 +184,7 @@ function normalizeAnalysis(value: unknown, role: StudyDocument['document_role'])
       const question = asText(card.question, 800);
       const answer = asText(card.answer, 1200);
       return question && answer ? [{ question, answer }] : [];
-    }).slice(0, 8)
+    }).slice(0, flashcardTarget)
     : [];
   const quizQuestions = Array.isArray(candidate.quizQuestions)
     ? candidate.quizQuestions.flatMap((item) => {
@@ -249,7 +254,7 @@ Deno.serve(async (request) => {
 
   const { data, error: documentError } = await client
     .from('student_study_documents')
-    .select('id, storage_path, mime_type, content_kind, document_role, analysis_status, analysis')
+    .select('id, storage_path, mime_type, content_kind, document_role, flashcard_target, analysis_status, analysis')
     .eq('id', documentId)
     .maybeSingle();
   const document = data as StudyDocument | null;
@@ -257,6 +262,7 @@ Deno.serve(async (request) => {
   if (document.analysis_status === 'completed' && document.analysis) return json({ analysis: document.analysis });
   if (document.analysis_status === 'processing') return json({ error: 'Este documento ya se está analizando.' }, 409);
   if (!document.storage_path.startsWith(`${userData.user.id}/`)) return json({ error: 'Documento no autorizado.' }, 403);
+  const flashcardTarget = Math.max(1, Math.min(8, Number.isInteger(document.flashcard_target) ? document.flashcard_target! : 3));
 
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) {
@@ -310,7 +316,7 @@ Deno.serve(async (request) => {
                   ? 'Analiza exclusivamente este audio de estudio para una semana de exámenes. Identifica con cautela las ideas expresadas; si una parte no es audible, no la inventes.'
                   : 'Analiza exclusivamente este PDF para una semana de exámenes.',
                 'No inventes información ni uses fuentes externas.',
-                'Escribe en español claro. Resume las ideas verificables, crea de 3 a 8 flashcards útiles y 3 a 5 preguntas de opción múltiple.',
+                `Escribe en español claro. Resume las ideas verificables, crea exactamente ${flashcardTarget} flashcards útiles y 3 a 5 preguntas de opción múltiple.`,
                 'Cada pregunta debe tener exactamente cuatro opciones, un índice correctOption de 0 a 3 y una explicación breve.',
               ].join(' '),
             },
@@ -319,7 +325,7 @@ Deno.serve(async (request) => {
         generationConfig: {
           maxOutputTokens: 2200,
           responseMimeType: 'application/json',
-          responseJsonSchema: document.document_role === 'syllabus' ? syllabusSchema : studySchema,
+          responseJsonSchema: document.document_role === 'syllabus' ? syllabusSchema : studySchema(flashcardTarget),
         },
       }),
     },
@@ -339,7 +345,7 @@ Deno.serve(async (request) => {
   const outputText = readGeminiText(await geminiResponse.json() as GeminiPayload);
   let analysis = null;
   try {
-    analysis = normalizeAnalysis(JSON.parse(outputText), document.document_role);
+    analysis = normalizeAnalysis(JSON.parse(outputText), document.document_role, flashcardTarget);
   } catch {
     analysis = null;
   }

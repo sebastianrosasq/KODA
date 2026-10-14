@@ -89,7 +89,7 @@ export async function exportKodaPersonalData() {
     readQuery(
       client
         .from('student_profiles')
-        .select('id, display_name, timezone, ai_document_consent_at, created_at, updated_at')
+        .select('id, display_name, avatar_path, timezone, ai_document_consent_at, created_at, updated_at')
         .eq('id', user.id)
         .maybeSingle(),
       'tu perfil',
